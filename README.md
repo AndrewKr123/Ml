@@ -14,13 +14,9 @@ This project demonstrates a complete machine learning pipeline: eda,data cleanin
 
 Clone the repository and install the required dependencies.
 
-```bash
-
 git clone https://github.com/AndrewKr123/Ml.git
-
 cd Ml
-
-pip install -r requirements.txt```
+pip install -r requirements.txt
 
 ## Usage
 
