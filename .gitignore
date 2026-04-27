@@ -1,7 +1,1 @@
-venv/
 .venv/
-__pycache__/
-.venv/
-*.pyc
-.ipynb_checkpoints/
-submission.csv
