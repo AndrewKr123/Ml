@@ -53,80 +53,77 @@ def analyze_outliers_iqr(data):
     return df_outliers
 
 
-
-
-def remove_outliers_iqr(data):
-
+def remove_outliers_iqr(data, threshold=1.5, max_outlier_pct=5.0):
+    #Удаляет выбросы по правилу IQR только для колонок, где процент выбросов превышает max_outlier_pct.
     data_clean = data.copy()
     num_cols = data_clean.select_dtypes(include=[np.number]).columns
     
-
-    Q1 = data_clean['SalePrice'].quantile(0.25)
-    Q3 = data_clean['SalePrice'].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lim_min = Q1 - 1.5 * IQR
-    lim_max = Q3 + 1.5 * IQR
-    
-    data_clean = data_clean[
-        (data_clean['SalePrice'] >= lim_min) & 
-        (data_clean['SalePrice'] <= lim_max)
-    ]
+    for col in num_cols:
+        Q1 = data_clean[col].quantile(0.25)
+        Q3 = data_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        if IQR == 0:
+            continue
+            
+        lower = Q1 - threshold * IQR
+        upper = Q3 + threshold * IQR
+        
+        outliers_mask = (data_clean[col] < lower) | (data_clean[col] > upper)
+        outlier_pct = outliers_mask.sum() / len(data_clean) * 100
+        
+        # Удаляем выбросы, только если их процент не превышает лимит
+        if outlier_pct <= max_outlier_pct:
+            data_clean = data_clean[~outliers_mask]
     
     removed = len(data) - len(data_clean)
     print(f"Удалено строк: {removed} ({removed/len(data)*100:.2f}%)")
     return data_clean
 
 def transform_skewed_features(data, test, threshold=0.75, lambda_val=0.15, auto_lambda=False):
+    """
+    Преобразование асимметричных признаков с помощью Box-Cox.
+    Работает с копиями данных, избегая ошибок read-only.
+    """
+    # Создаем копии, чтобы избежать ошибок read-only
+    data = data.copy()
+    test = test.copy()
     
     numerical_features = data.select_dtypes(include=[np.number]).columns
     
-    # Вычисляем асимметрию только на data
-    skewness = data[numerical_features].apply(lambda x: skew(x.dropna()))
+    # Вычисляем асимметрию
+    skewness = data[numerical_features].apply(lambda x: stats.skew(x.dropna()))
     skewed_features = skewness[abs(skewness) > threshold]
     positive_skew = skewed_features[skewed_features > threshold].index
-    """negative_skew = skewed_features[skewed_features < -threshold].index"""
-    
-    # Храним lambdas для положительных признаков (если auto_lambda)
-    lambdas = {}
     
     # Обработка положительной асимметрии
     for feat in positive_skew:
         if auto_lambda:
-            # Подбираем lambda по data, игнорируя нули/отрицательные (используем сдвиг)
-            data = data[feat].values
-            # Добавляем маленький сдвиг, если есть нули
-            if np.min(data) <= 0:
-                shift = -np.min(data) + 1e-6
-                data = data + shift
+            # Подбираем lambda по данным
+            vals = data[feat].values
+            # Добавляем сдвиг, если есть нули или отрицательные значения
+            if np.min(vals) <= 0:
+                shift = -np.min(vals) + 1e-6
+                vals = vals + shift
             else:
                 shift = 0
-            # Box-Cox (требует положительных значений)
+            
             try:
-                transformed, lam = boxcox(data)
-                lambdas[feat] = (lam, shift)
+                transformed, lam = stats.boxcox(vals)
+                # Применяем к train
                 data[feat] = transformed
-                # Применяем к test: сначала сдвиг, потом Box-Cox с тем же lam
-                test[feat] = boxcox(test[feat] + shift, lam)
-            except:
-                # Если не получилось, используем фиксированный lambda
-                data[feat] = boxcox(data[feat], lambda_val)
-                test[feat] = boxcox(test[feat], lambda_val)
+                # Применяем к test с тем же lam и сдвигом
+                test_vals = test[feat].values
+                test[feat] = stats.boxcox(test_vals + shift, lam)
+            except Exception as e:
+                print(f"Box-Cox failed for {feat}: {e}. Using fixed lambda={lambda_val}")
+                data[feat] = stats.boxcox(data[feat].values + 1e-6, lambda_val)
+                test[feat] = stats.boxcox(test[feat].values + 1e-6, lambda_val)
         else:
-            # Фиксированный lambda_val
-            data[feat] = boxcox(data[feat], lambda_val)
-            test[feat] = boxcox(test[feat], lambda_val)
+            # Фиксированный lambda
+            data[feat] = stats.boxcox(data[feat].values + 1e-6, lambda_val)
+            test[feat] = stats.boxcox(test[feat].values + 1e-6, lambda_val)
     
-    # Обработка отрицательной асимметрии (зеркальное логарифмирование)
-    """for feat in negative_skew:
-        max_data = data[feat].max()
-        # Сдвиг, чтобы минимальное значение стало положительным
-        min_val = data[feat].min()
-        shift = -min_val + 1e-6 if min_val <= 0 else 0
-        data[feat] = np.log1p(max_data - data[feat] + shift + 1e-6)
-        # Для теста используем тот же max_data (из data)
-        test[feat] = np.log1p(max_data - test[feat] + shift + 1e-6)"""
-        
     return data, test
 
 def get_saleprice_bounds(df, price_col='SalePrice', threshold=1.5, lower_percentile=0.01, upper_percentile=0.99):
@@ -153,3 +150,16 @@ def get_saleprice_bounds(df, price_col='SalePrice', threshold=1.5, lower_percent
     print(f"Аномалий: {result['n_anomalies']} ({result['percent_anomalies']:.2f}%)")
     
     return result
+
+def clip_df(df, columns=None, lower_q=0.01, upper_q=0.99):
+    df = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include='number').columns
+    
+    for col in columns:
+        low = df[col].quantile(lower_q)
+        high = df[col].quantile(upper_q)
+        df[col] = df[col].clip(low, high)
+    
+    return df

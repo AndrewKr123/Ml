@@ -1,7 +1,10 @@
+
 import pandas as pd
 import numpy as np
-from sklearn.feature_selection import mutual_info_regression
-from itertools import combinations
+from scipy.stats import norm, skew
+from scipy.stats import boxcox
+from scipy import stats
+
 def group_rare_neighborhoods(train, test, threshold):
     """
     Объединяет районы с числом домов < threshold в категорию 'Other'.
@@ -15,42 +18,159 @@ def group_rare_neighborhoods(train, test, threshold):
     test['Neighborhood'] = test['Neighborhood'].apply(lambda x: 'Other' if x in rare else x)
     return train, test
 
-def mi_interaction_features(X, y, top_k=20, top_interactions=20):
+from itertools import combinations
+from sklearn.feature_selection import mutual_info_regression
+import pandas as pd
+import numpy as np
+
+
+
+def transform_skewed_features(data, test, threshold=0.75, lambda_val=0.15, auto_lambda=False):
     """
-    Автоматически создаёт interaction features через Mutual Information.
+    Преобразование асимметричных признаков с помощью np.log1p.
+    Простая и надёжная версия.
     """
+    import numpy as np
+    from scipy.stats import skew
+    
+    data = data.copy()
+    test = test.copy()
+    
+    num_cols = data.select_dtypes(include=[np.number]).columns
+    
+    for col in num_cols:
+        if data[col].nunique() <= 1:
+            continue
+            
+        skew_val = skew(data[col].dropna())
+        
+        if abs(skew_val) > threshold:
+            min_val = data[col].min()
+            if min_val <= 0:
+                shift = abs(min_val) + 1
+                data[col] = np.log1p(data[col] + shift)
+                test[col] = np.log1p(test[col] + shift)
+            else:
+                data[col] = np.log1p(data[col])
+                test[col] = np.log1p(test[col])
+            
+            print(f"Transformed {col}: skew {skew_val:.2f} -> {skew(data[col]):.2f}")
+    
+    return data, test
 
-    X = X.copy()
+def remove_outliers_iqr(data, threshold=1.5, max_outlier_pct=5.0):
+    """
+    Удаляет выбросы по правилу IQR только для колонок, 
+    где процент выбросов не превышает max_outlier_pct.
+    """
+    data_clean = data.copy()
+    num_cols = data_clean.select_dtypes(include=[np.number]).columns
+    
+    for col in num_cols:
+        Q1 = data_clean[col].quantile(0.25)
+        Q3 = data_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        if IQR == 0:
+            continue
+            
+        lower = Q1 - threshold * IQR
+        upper = Q3 + threshold * IQR
+        
+        outliers_mask = (data_clean[col] < lower) | (data_clean[col] > upper)
+        outlier_pct = outliers_mask.sum() / len(data_clean) * 100
+        
+        if outlier_pct <= max_outlier_pct:
+            data_clean = data_clean[~outliers_mask]
+    
+    removed = len(data) - len(data_clean)
+    print(f"Удалено строк: {removed} ({removed/len(data)*100:.2f}%)")
+    return data_clean
 
-    # 1. MI для одиночных признаков
-    mi_single = mutual_info_regression(X, y)
-    mi_single = pd.Series(mi_single, index=X.columns)
 
-    # 2. выбираем top-K признаков
-    top_features = mi_single.sort_values(ascending=False).head(top_k).index.tolist()
+def fill_missing_values(data,test):
 
-    interactions = []
+    cat_cols = data.select_dtypes(include=['object']).columns
+    num_cols = data.select_dtypes(exclude=['object']).columns
 
-    # 3. считаем MI для пар
-    for f1, f2 in combinations(top_features, 2):
+    for col in cat_cols:
+        data[col] = data[col].fillna('None')
+        test[col] = test[col].fillna('None')
 
-        pair = X[[f1, f2]].copy()
-        mi_pair = mutual_info_regression(pair, y).sum()
+    for col in num_cols:
+        data[col] = data[col].fillna(0)
+        test[col] = test[col].fillna(0)
+    return data,test
 
-        # приближение "выигрыша информации"
-        gain = mi_pair - mi_single[f1] - mi_single[f2]
+def analyze_outliers_iqr(data):
+    
+    results = []
+    num_cols = data.select_dtypes(include=[np.number]).columns
+    
+    for col in num_cols:
+        Q1 = data[col].quantile(0.25)
+        Q3 = data[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        # Если IQR = 0, пропускаем (все значения одинаковые)
+        if IQR == 0:
+            continue
+            
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
 
-        interactions.append((f1, f2, gain))
+        outliers = data[(data[col] < lower_bound) | (data[col] > upper_bound)]
+        
+        if len(outliers) > 0:
+            results.append({
+                'Column': col,
+                'Outliers_Count': len(outliers),
+                'Outliers_Pct': round(len(outliers) / len(data) * 100, 2),
+                'Lower_Bound': round(lower_bound, 2),
+                'Upper_Bound': round(upper_bound, 2),
+                'Min_Outlier': round(outliers[col].min(), 2),
+                'Max_Outlier': round(outliers[col].max(), 2)
+            })
+    
+    df_outliers = pd.DataFrame(results).sort_values('Outliers_Count', ascending=False)
+    return df_outliers
 
-    # 4. сортируем по полезности
-    interactions.sort(key=lambda x: x[2], reverse=True)
 
-    # 5. берём лучшие пары
-    best_pairs = interactions[:top_interactions]
+def get_saleprice_bounds(df, price_col='SalePrice', threshold=1.5, lower_percentile=0.01, upper_percentile=0.99):
+    
+    data = df[price_col].dropna()
+    
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - threshold * IQR
+    upper = Q3 + threshold * IQR
 
-    # 6. создаём новые признаки
-    for f1, f2, gain in best_pairs:
-        new_name = f"{f1}_x_{f2}"
-        X[new_name] = X[f1] * X[f2]
+    anomalies = data[(data < lower) | (data > upper)]
+    
+    result = {
+        'lower_bound': lower,
+        'upper_bound': upper,
+        'n_anomalies': len(anomalies),
+        'percent_anomalies': len(anomalies) / len(data) * 100,
+    }
+    
+    print(f"Нижняя граница: {lower:,.0f}")
+    print(f"Верхняя граница: {upper:,.0f}")
+    print(f"Аномалий: {result['n_anomalies']} ({result['percent_anomalies']:.2f}%)")
+    
+    return result
 
-    return X, best_pairs
+def clip_df(df, columns=None, lower_q=0.01, upper_q=0.99):
+    df = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include='number').columns
+    
+    for col in columns:
+        low = df[col].quantile(lower_q)
+        high = df[col].quantile(upper_q)
+        df[col] = df[col].clip(low, high)
+    
+    return df
