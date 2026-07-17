@@ -174,3 +174,54 @@ def clip_df(df, columns=None, lower_q=0.01, upper_q=0.99):
         df[col] = df[col].clip(low, high)
     
     return df
+
+def feature_saleprice(X_train: pd.DataFrame, X_test: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Создает новые признаки для датасета House Prices.
+    
+    Созданные признаки:
+    - QualArea: Взаимодействие качества и площади (OverallQual * GrLivArea)
+    - TotalBath: Общее количество ванных комнат (с учетом половинных)
+    - TotalPorchSF: Общая площадь крыльца/веранды
+    - HouseAge: Возраст дома
+    - RemodAge: Возраст после последнего ремонта
+    - IsRemodeled: Был ли дом отремонтирован (бинарный признак)
+    
+    Parameters:
+    -----------
+    X_train : pd.DataFrame
+        Тренировочные данные
+    X_test : pd.DataFrame
+        Тестовые данные
+        
+    Returns:
+    --------
+    tuple[pd.DataFrame, pd.DataFrame]
+        Кортеж из (X_train с новыми признаками, X_test с новыми признаками)
+    """
+    # Создаем копии, чтобы не изменять оригинальные данные
+    X_train = X_train.copy()
+    X_test = X_test.copy()
+    
+    # 1. Взаимодействие качества и площади
+    X_train['QualArea'] = X_train['OverallQual'] * X_train['GrLivArea']
+    X_test['QualArea'] = X_test['OverallQual'] * X_test['GrLivArea']
+    
+    # 2. Общее количество ванных комнат
+    for df in [X_train, X_test]:
+        df['TotalBath'] = (df['FullBath'] + 0.5 * df['HalfBath'] + 
+                           df['BsmtFullBath'] + 0.5 * df['BsmtHalfBath'])
+    
+    # 3. Общая площадь крыльца/веранды
+    for df in [X_train, X_test]:
+        df['TotalPorchSF'] = (df['OpenPorchSF'] + df['EnclosedPorch'] + 
+                              df['3SsnPorch'] + df['ScreenPorch'])
+    
+    # 4. Возраст дома и ремонта
+    for df in [X_train, X_test]:
+        df['HouseAge'] = df['YrSold'] - df['YearBuilt']
+        df['RemodAge'] = df['YrSold'] - df['YearRemodAdd']
+        df['IsRemodeled'] = (df['YearRemodAdd'] != df['YearBuilt']).astype(int)
+    
+    return X_train, X_test
+
