@@ -237,3 +237,30 @@ def feature_saleprice_single(df: pd.DataFrame) -> pd.DataFrame:
     df['IsRemodeled'] = (df['YearRemodAdd'] != df['YearBuilt']).astype(int)
     
     return df
+
+def to_drop(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Удаляет признаки, которые дублируют информацию или являются шумом.
+    
+    Удаляемые признаки:
+    - TotRmsAbvGrd: дублирует GrLivArea (высокая мультиколлинеарность)
+    - GarageArea: дублирует GarageCars (высокая мультиколлинеарность)
+    - BsmtFinSF2: почти всегда 0, шум
+    - TotalBsmtSF: сумма BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF (идеальная мультиколлинеарность)
+    - GrLivArea: сумма 1stFlrSF + 2ndFlrSF + LowQualFinSF (идеальная мультиколлинеарность)
+    - LowQualFinSF: почти всегда 0, шум
+    - GarageYrBlt: дублирует YearBuilt (высокая корреляция)
+    - 'PoolQC', 'MiscFeature', 'Alley', 'Fence','MasVnrType' пропусков > 50%
+    """
+    df = df.copy()
+    cols_to_drop = [
+    'PoolQC', 'MiscFeature', 'Alley', 'Fence', 
+    'TotRmsAbvGrd', 'GarageArea','BsmtFinSF2',
+    'TotalBsmtSF', 'GrLivArea', 'LowQualFinSF',
+    'MasVnrType', 'GarageYrBlt'
+    ]
+    df = df.drop(cols_to_drop, axis=1, errors='ignore')
+    return df
+
+
+    
