@@ -106,6 +106,7 @@ pip install -e .                 # делает src/ и utils/ импортир�
 |---|---|---|---|
 | MAE | $22 978.93 | $16 414.40 | −$6 564.54 |
 | RMSE | $36 839.73 | $28 243.03 | −$8 596.70 |
+| MAPE | 13.46% | 9.39% | −4.07 п.п. |
 | R² | 0.823 | 0.896 | +0.073 |
 
 Лучшая `alpha` по кросс-валидации: `30` (CV RMSE на log-таргете = 0.130). Подробности решений (включая разбор мультиколлинеарности через VIF) — `notebooks/02_house_prices_eda.ipynb`; код — `src/house_prices_preprocessing.py`; диагностические графики (residuals, predicted vs actual, коэффициенты модели) — `models/house_prices/plots/`.

@@ -11,6 +11,7 @@ from sklearn.metrics import (
     accuracy_score,
     f1_score,
     mean_absolute_error,
+    mean_absolute_percentage_error,
     precision_score,
     recall_score,
     roc_auc_score,
@@ -18,12 +19,16 @@ from sklearn.metrics import (
     r2_score,
 )
 
+# Единицы измерения для форматирования print_metrics (по умолчанию — без суффикса).
+_METRIC_UNITS = {"mape_pct": "%"}
+
 
 def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    """MAE/RMSE/R2 в исходных единицах измерения таргета."""
+    """MAE/RMSE/MAPE/R2 в исходных единицах измерения таргета (MAPE — в процентах)."""
     return {
         "mae": float(mean_absolute_error(y_true, y_pred)),
         "rmse": float(root_mean_squared_error(y_true, y_pred)),
+        "mape_pct": float(mean_absolute_percentage_error(y_true, y_pred) * 100),
         "r2": float(r2_score(y_true, y_pred)),
     }
 
@@ -47,7 +52,8 @@ def print_metrics(title: str, metrics: dict[str, float]) -> None:
     print(f"\n{title}")
     print("-" * len(title))
     for name, value in metrics.items():
-        print(f"{name:>10}: {value:,.4f}")
+        unit = _METRIC_UNITS.get(name, "")
+        print(f"{name:>10}: {value:,.4f}{unit}")
 
 
 def compare_metrics(baseline: dict[str, float], final: dict[str, float]) -> dict[str, dict[str, float]]:
