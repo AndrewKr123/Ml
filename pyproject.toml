@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml-linreg-logreg-course"
+version = "0.1.0"
+description = "Учебный проект: линейная регрессия (House Prices) и логистическая регрессия (Titanic)"
+requires-python = ">=3.10"
+
+[tool.setuptools]
+packages = ["src", "utils"]

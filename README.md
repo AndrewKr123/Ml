@@ -1,28 +1,116 @@
-# House Price Prediction
+# ML: линейная и логистическая регрессия
 
+Учебный репозиторий с двумя классическими Kaggle-задачами:
 
+- **[Titanic](https://www.kaggle.com/c/titanic)** — предсказать выживаемость пассажира (бинарная классификация → **логистическая регрессия**).
+- **[House Prices](https://www.kaggle.com/c/house-prices-advanced-regression-techniques)** — предсказать цену дома (регрессия → **линейная регрессия / Ridge**).
 
-> Exploratory data analysis and models for predicting house prices.
+Для каждой задачи есть: разведочный анализ данных (EDA) с объяснениями, честный пайплайн обучения с baseline-моделью для сравнения, и итоговая модель с воспроизводимыми метриками. Отдельно — теоретические ноутбуки по обоим методам и конспект вопросов к собеседованию.
 
+## Структура репозитория
 
+```
+Ml/
+├── data/
+│   ├── titanic/{raw,processed}/          сырые и предобработанные данные Titanic
+│   └── house_prices/{raw,processed}/     сырые и предобработанные данные House Prices
+├── notebooks/
+│   ├── 01_titanic_eda.ipynb              EDA + обоснование feature engineering (Titanic)
+│   └── 02_house_prices_eda.ipynb         EDA + обоснование feature engineering (House Prices)
+├── scripts/
+│   ├── download_data.py                  скачивание raw-данных через Kaggle API
+│   ├── train_titanic.py                  полный пайплайн: baseline → CV → final → метрики
+│   └── train_house_prices.py             полный пайплайн: baseline → CV → final → метрики
+├── src/
+│   ├── titanic_preprocessing.py          очистка/инженерия признаков + sklearn-пайплайны (Titanic)
+│   ├── house_prices_preprocessing.py     очистка/инженерия признаков + sklearn-пайплайны (House Prices)
+│   └── evaluation.py                     общие метрики/отчёты для обеих задач
+├── utils/
+│   └── plotting.py                       все графические функции проекта (единый стиль)
+├── models/
+│   ├── titanic/{model.joblib,metrics.json,submission.csv,plots/}
+│   └── house_prices/{model.joblib,metrics.json,submission.csv,plots/}
+├── tutorials/
+│   ├── linearregression.ipynb            теория линейной регрессии с нуля
+│   └── logisticregression.ipynb          теория логистической регрессии с нуля
+├── questions.md                          конспект вопросов к собеседованию (линейная регрессия)
+├── pyproject.toml
+└── requirements.txt
+```
 
-This project demonstrates a complete machine learning pipeline: eda,data cleaning, feature engineering, handling missing values and outliers, transforming skewed features, encoding categorical variables, training linear models, and evaluating performance.
+## Установка
 
-
-
-## Install
-
-Clone the repository and install the required dependencies.
-
-git clone https://github.com/AndrewKr123/Ml.git
-
+```bash
+git clone <repo-url>
 cd Ml
 
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
 pip install -r requirements.txt
+pip install -e .                 # делает src/ и utils/ импортируемыми откуда угодно
+```
 
-## Usage
+`pip install -e .` — ключевой шаг: после него `from src.titanic_preprocessing import ...` и `from utils.plotting import ...` работают и в ноутбуках, и в скриптах, без ручных `sys.path.insert(...)`.
 
-The main analysis and modeling steps are contained in Jupyter notebooks. The reusable preprocessing functions are placed in the src/ directory.
+## Данные
 
+Сырые данные уже лежат в `data/titanic/raw/` и `data/house_prices/raw/` — это подлинные CSV с Kaggle, ничего скачивать не обязательно, чтобы всё запустить.
 
+Чтобы перекачать их заново (или в чистом окружении без этого репозитория):
 
+1. Создать API-токен: [kaggle.com/settings](https://www.kaggle.com/settings) → *API* → *Create New Token* → положить `kaggle.json` в `~/.kaggle/kaggle.json` (`chmod 600`).
+2. Принять правила соревнований: [titanic/rules](https://www.kaggle.com/c/titanic/rules), [house-prices.../rules](https://www.kaggle.com/c/house-prices-advanced-regression-techniques/rules).
+3. `python scripts/download_data.py`
+
+Обработанные датасеты (`data/*/processed/*.csv`) генерируются автоматически при запуске `scripts/train_*.py` — их не нужно готовить отдельно.
+
+## Как пользоваться репозиторием
+
+1. **Сначала ноутбуки** — `notebooks/01_titanic_eda.ipynb` и `notebooks/02_house_prices_eda.ipynb`. Это разведочный анализ с объяснением, почему принято то или иное решение по предобработке (что делать с пропусками, какие признаки инженерить, как кодировать категории). Все функции, которые здесь только показываются и объясняются, реально используются ниже в `scripts/` — никакого расхождения между "тем, что объяснили" и "тем, что выполнилось".
+2. **Теория** — `tutorials/linearregression.ipynb` и `tutorials/logisticregression.ipynb`, если нужно освежить сам метод (вывод функции потерь, градиентный спуск с нуля, регуляризация, диагностика модели, метрики) — на синтетических данных, изолированно от конкретной задачи.
+3. **Обучение** — `python scripts/train_titanic.py` и `python scripts/train_house_prices.py`. Каждый скрипт:
+   - делит `train.csv` на train/hold-out (у Kaggle `test.csv` нет меток — он не участвует в подсчёте метрик, только в генерации `submission.csv`);
+   - обучает **baseline**-модель без предобработки/инженерии признаков;
+   - обучает **финальную** модель (инженерия признаков + корректный `ColumnTransformer` + кросс-валидация для подбора гиперпараметра);
+   - печатает метрики baseline vs final на одном и том же hold-out сплите;
+   - сохраняет модель, метрики, диагностические графики и Kaggle-submission в `models/<task>/`.
+
+## Titanic — логистическая регрессия
+
+**Baseline** (`LogisticRegression`): только `Pclass, Sex, Age, Fare, SibSp, Parch`, без масштабирования и инженерии признаков — то, что сделал бы новичок в первый день.
+
+**Final**: инженерия признаков (`Title` из имени, `FamilySize`/`IsAlone`, возраст, импутированный по группам `Title`, `Fare` после `log1p`, палуба `Deck` из `Cabin`), корректный `ColumnTransformer` (`StandardScaler` + `OneHotEncoder`), подбор `C` через `GridSearchCV` + `StratifiedKFold` (5 фолдов, метрика ROC-AUC).
+
+Метрики на одном и том же hold-out сплите (20% от `train.csv`), воспроизводятся `python scripts/train_titanic.py`:
+
+| Метрика | Baseline | Final | Δ |
+|---|---|---|---|
+| Accuracy | 0.8045 | 0.8268 | +0.022 |
+| Precision | 0.7656 | 0.7969 | +0.031 |
+| Recall | 0.7101 | 0.7391 | +0.029 |
+| F1 | 0.7368 | 0.7669 | +0.030 |
+| ROC-AUC | 0.8515 | 0.8648 | +0.013 |
+
+Лучший `C` по кросс-валидации: `0.3` (CV ROC-AUC = 0.876). Подробности решений — `notebooks/01_titanic_eda.ipynb`; код — `src/titanic_preprocessing.py`; диагностические графики (confusion matrix, ROC-кривая, коэффициенты модели) — `models/titanic/plots/`.
+
+## House Prices — линейная регрессия
+
+**Baseline** (`LinearRegression`): все сырые числовые колонки как есть, только медианная импутация — без кодирования категорий, без чистки мультиколлинеарности, без лог-таргета.
+
+**Final** (`Ridge`): чистка признаков-дублей (`GrLivArea`, `TotalBsmtSF` и др. — идеальная мультиколлинеарность, см. EDA), инженерия (`TotalBath`, `TotalPorchSF`, `HouseAge`, `RemodAge`, `QualArea`), `log1p(SalePrice)` + логарифмирование скошенных числовых признаков, `ColumnTransformer` (`OrdinalEncoder` для порядковых шкал качества, `OneHotEncoder` для номинальных категорий, честный `TargetEncoder` с cross-fitting для `Neighborhood`) + `RobustScaler`, подбор `alpha` через `GridSearchCV` + `KFold` (5 фолдов, метрика RMSE на log-таргете).
+
+Метрики на одном и том же hold-out сплите (20% от `train.csv`, в долларах, после обратного `expm1`-преобразования), воспроизводятся `python scripts/train_house_prices.py`:
+
+| Метрика | Baseline | Final | Δ |
+|---|---|---|---|
+| MAE | $22 978.93 | $16 414.40 | −$6 564.54 |
+| RMSE | $36 839.73 | $28 243.03 | −$8 596.70 |
+| R² | 0.823 | 0.896 | +0.073 |
+
+Лучшая `alpha` по кросс-валидации: `30` (CV RMSE на log-таргете = 0.130). Подробности решений (включая разбор мультиколлинеарности через VIF) — `notebooks/02_house_prices_eda.ipynb`; код — `src/house_prices_preprocessing.py`; диагностические графики (residuals, predicted vs actual, коэффициенты модели) — `models/house_prices/plots/`.
+
+## Теория и справочные материалы
+
+- `tutorials/linearregression.ipynb`, `tutorials/logisticregression.ipynb` — теория методов с нуля: постановка задачи, функция потерь, аналитическое и итеративное решение, регуляризация, диагностика, метрики.
+- `questions.md` — личный конспект вопросов к собеседованию по линейной регрессии (справочный материал, не туториал).
