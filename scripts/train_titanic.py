@@ -20,6 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 
 from src.evaluation import classification_metrics, print_metrics, save_json
@@ -31,6 +32,13 @@ from src.titanic_preprocessing import (
     load_raw,
 )
 from utils.plotting import plot_coefficients, plot_confusion_matrix, plot_roc_curve, set_style
+
+import warnings
+
+# Подавляем только предупреждения о Deprecated параметре probability в SVC
+warnings.filterwarnings(
+    "ignore", category=FutureWarning, module="sklearn.svm"
+)
 
 MODELS_DIR = Path("models/titanic")
 PROCESSED_DIR = Path("data/titanic/processed")
@@ -76,6 +84,61 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         base_value = baseline_metrics[key]
         print(f"{key:>10}: {base_value:.4f} -> {final_value:.4f}  (delta {final_value - base_value:+.4f})")
 
+    # ================= SVM и Kernel SVM с RBF-ядром=================
+    svm_lin_pipeline = build_final_pipeline(SVC(kernel="linear", probability=True, random_state=random_state))
+    svm_lin_grid = GridSearchCV(
+        svm_lin_pipeline, {"model__C": C_GRID}, scoring="roc_auc", cv=cv, n_jobs=-1
+    )
+    svm_lin_grid.fit(train_fe, train_fe["Survived"])
+    svm_lin_model = svm_lin_grid.best_estimator_
+    svm_lin_pred = svm_lin_model.predict(holdout_fe)
+    svm_lin_prob = svm_lin_model.predict_proba(holdout_fe)[:, 1]
+    svm_lin_metrics = classification_metrics(
+        holdout_fe["Survived"], svm_lin_pred, svm_lin_prob
+    )
+    print_metrics(
+        f"SVM Linear (best C={svm_lin_grid.best_params_['model__C']})",
+        svm_lin_metrics,
+    )
+
+    # 2. Kernel SVM (RBF Kernel)
+    svm_rbf_pipeline = build_final_pipeline(
+        SVC(kernel="rbf", probability=True, random_state=random_state)
+    )
+    svm_rbf_param_grid = {
+        "model__C": C_GRID,
+        "model__gamma": ["scale", "auto", 0.001, 0.01, 0.1, 1.0],
+    }
+    svm_rbf_grid = GridSearchCV(
+        svm_rbf_pipeline,
+        svm_rbf_param_grid,
+        scoring="roc_auc",
+        cv=cv,
+        n_jobs=-1,
+    )
+    svm_rbf_grid.fit(train_fe, train_fe["Survived"])
+
+    svm_rbf_model = svm_rbf_grid.best_estimator_
+    svm_rbf_pred = svm_rbf_model.predict(holdout_fe)
+    svm_rbf_prob = svm_rbf_model.predict_proba(holdout_fe)[:, 1]
+    svm_rbf_metrics = classification_metrics(
+        holdout_fe["Survived"], svm_rbf_pred, svm_rbf_prob
+    )
+    print_metrics(
+        f"SVM RBF (best params={svm_rbf_grid.best_params_})", svm_rbf_metrics
+    )
+
+    print("\n=== СРАВНЕНИЕ ВСЕХ МОДЕЛЕЙ (hold-out test) ===")
+    models_comp = {
+        "Baseline (LR)": baseline_metrics,
+        "Final (LR)": final_metrics,
+        "SVM (Linear)": svm_lin_metrics,
+        "SVM (RBF)": svm_rbf_metrics,
+    }
+    for m_name, m_metrics in models_comp.items():
+        print(
+            f"{m_name:<15} | ROC-AUC: {m_metrics.get('roc_auc', 0):.4f} | Accuracy: {m_metrics.get('accuracy', 0):.4f}"
+        )
     # ================= сохранение артефактов =================
     (MODELS_DIR / "plots").mkdir(parents=True, exist_ok=True)
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
@@ -84,9 +147,14 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
     save_json(
         {
             "baseline": baseline_metrics,
-            "final": final_metrics,
-            "best_C": grid.best_params_["model__C"],
-            "cv_roc_auc": grid.best_score_,
+            "final_lr": final_metrics,
+            "svm_linear": svm_lin_metrics,
+            "svm_rbf": svm_rbf_metrics,
+            "best_C_lr": grid.best_params_["model__C"],
+            "best_params_svm_linear": svm_lin_grid.best_params_,
+            "best_params_svm_rbf": svm_rbf_grid.best_params_,
+            "cv_roc_auc_lr": grid.best_score_,
+            "cv_roc_auc_svm_rbf": svm_rbf_grid.best_score_,
             "test_size": test_size,
             "random_state": random_state,
         },
