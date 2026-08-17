@@ -24,6 +24,7 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import GridSearchCV, KFold, train_test_split
 from sklearn.pipeline import Pipeline
 
@@ -86,6 +87,24 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
     final_metrics = regression_metrics(holdout_fe[TARGET], final_pred)
     print_metrics("FINAL: инженерия признаков + Ridge (CV-подбор alpha)", final_metrics)
 
+    # ================= Decision Tree =================
+    dt_param_grid = {
+        "model__max_depth": [2, 3, 4, 5, 6, 7, 8, None],
+        "model__min_samples_split": [2, 5, 10, 20],
+        "model__min_samples_leaf": [1, 2, 4, 8],
+        }
+    
+    pipeline_tree = Pipeline([("preprocess", preprocessor), ("model", DecisionTreeRegressor(random_state=random_state))])
+    grid_tree = GridSearchCV(
+        pipeline_tree, dt_param_grid, scoring="neg_root_mean_squared_error", cv=cv, n_jobs=-1
+    )
+    grid_tree.fit(train_fe, y_train_log)
+    print(f"\nЛучшие параметры для дерева решений:{grid_tree.best_params_}")
+    model_tree = grid_tree.best_estimator_
+    final_pred_tree = np.expm1(model_tree.predict(holdout_fe))
+    metrics_tree =  regression_metrics(holdout_fe[TARGET], final_pred_tree)
+    print_metrics("Метрики дерева решений", metrics_tree)
+    
     print("\n=== BASELINE vs FINAL (hold-out test, $) ===")
     for key, final_value in final_metrics.items():
         base_value = baseline_metrics[key]
@@ -100,8 +119,10 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         {
             "baseline": baseline_metrics,
             "final": final_metrics,
+            "decision tree": metrics_tree,
             "best_alpha": grid.best_params_["model__alpha"],
             "cv_rmse_log": -grid.best_score_,
+            "best params for tree": grid_tree.best_params_,
             "test_size": test_size,
             "random_state": random_state,
         },

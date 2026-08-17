@@ -131,6 +131,7 @@ def plot_numeric_distributions(df: pd.DataFrame, cols: list[str], ncols: int = 3
     for ax in axes[len(cols):]:
         ax.axis("off")
     fig.tight_layout()
+    plt.show()
     return fig
 
 
@@ -205,3 +206,238 @@ def plot_coefficients(feature_names: list[str], coefficients: np.ndarray, top_n:
     ax.axvline(0, color=TEXT_SECONDARY, linewidth=0.8)
     ax.set_title(title)
     return ax
+
+
+# ================= Дополнения для EDA Iris / многоклассовой классификации =================
+
+def plot_class_balance(
+    y,
+    target_names: list[str] | None = None,
+    title: str = "Распределение классов",
+    ax=None,
+):
+    """
+    Столбчатый график баланса классов.
+
+    Параметры:
+    y : array-like или pd.Series
+        Целевая переменная.
+    target_names : list[str] | None
+        Названия классов. Если y содержит числовые коды 0,1,2,...,
+        они будут заменены на названия.
+    """
+    s = y if isinstance(y, pd.Series) else pd.Series(y)
+
+    if target_names is not None:
+        if pd.api.types.is_integer_dtype(s):
+            s = s.map(dict(enumerate(target_names)))
+
+        counts = s.value_counts().reindex(target_names, fill_value=0)
+        counts = counts[counts > 0]
+    else:
+        counts = s.value_counts().sort_values(ascending=False)
+
+    if counts.empty:
+        print("Классы не найдены.")
+        return None
+
+    fig, ax = (None, ax) if ax is not None else plt.subplots(
+        figsize=(max(5, 0.7 * len(counts)), 4.2)
+    )
+
+    colors = CATEGORICAL_PALETTE[: len(counts)]
+
+    ax.bar(counts.index.astype(str), counts.values, color=colors)
+    ax.set_ylabel("Количество объектов")
+    ax.set_title(title)
+
+    for i, count in enumerate(counts.values):
+        ax.text(
+            i,
+            count,
+            str(int(count)),
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            color=TEXT_SECONDARY,
+        )
+
+    return ax
+
+
+def plot_pairplot(
+    df: pd.DataFrame,
+    hue_col: str,
+    cols: list[str] | None = None,
+    title: str | None = None,
+):
+    """
+    Pairplot для числовых признаков с раскраской по категориальному признаку.
+    Удобно для Iris: hue_col='species'.
+    """
+    if cols is None:
+        cols = [
+            col
+            for col in df.select_dtypes(include="number").columns
+            if col != hue_col
+        ]
+
+    plot_df = df[cols + [hue_col]].dropna()
+
+    g = sns.pairplot(
+        data=plot_df,
+        vars=cols,
+        hue=hue_col,
+        palette=CATEGORICAL_PALETTE,
+        diag_kind="kde",
+        height=2.2,
+        plot_kws={
+            "alpha": 0.7,
+            "edgecolor": "none",
+            "s": 16,
+        },
+    )
+
+    if title is not None:
+        g.figure.suptitle(title, y=1.02)
+
+    return g
+
+
+def plot_scatter_by_class(
+    df: pd.DataFrame,
+    x_col: str,
+    y_col: str,
+    class_col: str,
+    title: str | None = None,
+    ax=None,
+):
+    """
+    Scatter plot двух числовых признаков с раскраской по классу.
+    """
+    fig, ax = (None, ax) if ax is not None else plt.subplots(figsize=(6.5, 5))
+
+    classes = pd.unique(df[class_col])
+
+    for i, cls in enumerate(classes):
+        mask = df[class_col] == cls
+        ax.scatter(
+            df.loc[mask, x_col],
+            df.loc[mask, y_col],
+            label=str(cls),
+            color=CATEGORICAL_PALETTE[i % len(CATEGORICAL_PALETTE)],
+            alpha=0.65,
+            s=22,
+            edgecolor="none",
+        )
+
+    ax.set_xlabel(x_col)
+    ax.set_ylabel(y_col)
+    ax.set_title(title or f"{x_col} vs {y_col}")
+    ax.legend(title=class_col, fontsize=9, title_fontsize=9)
+
+    return ax
+
+
+def plot_boxplots_by_class(
+    df: pd.DataFrame,
+    class_col: str,
+    feature_cols: list[str] | None = None,
+    ncols: int = 2,
+    title: str | None = None,
+):
+    """
+    Сетка боксплотов: распределение числовых признаков по классам.
+    """
+    if feature_cols is None:
+        feature_cols = [
+            col
+            for col in df.select_dtypes(include="number").columns
+            if col != class_col
+        ]
+
+    nrows = int(np.ceil(len(feature_cols) / ncols))
+
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(5.2 * ncols, 3.5 * nrows),
+    )
+
+    axes = np.atleast_1d(axes).flatten()
+    classes = pd.unique(df[class_col])
+
+    for i, col in enumerate(feature_cols):
+        sns.boxplot(
+            data=df,
+            x=class_col,
+            y=col,
+            order=classes,
+            ax=axes[i],
+            palette=CATEGORICAL_PALETTE[: len(classes)],
+        )
+        axes[i].set_title(col, fontsize=10)
+        axes[i].set_xlabel("")
+        axes[i].tick_params(axis="x", rotation=45)
+
+    for ax in axes[len(feature_cols):]:
+        ax.axis("off")
+
+    if title is not None:
+        fig.suptitle(title, y=1.02)
+
+    fig.tight_layout()
+    return fig
+
+
+def plot_kde_by_class(
+    df: pd.DataFrame,
+    class_col: str,
+    feature_cols: list[str] | None = None,
+    ncols: int = 2,
+    title: str | None = None,
+):
+    """
+    Сетка KDE-графиков: распределение числовых признаков по классам.
+    """
+    if feature_cols is None:
+        feature_cols = [
+            col
+            for col in df.select_dtypes(include="number").columns
+            if col != class_col
+        ]
+
+    nrows = int(np.ceil(len(feature_cols) / ncols))
+
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(5.2 * ncols, 3.3 * nrows),
+    )
+
+    axes = np.atleast_1d(axes).flatten()
+    classes = pd.unique(df[class_col])
+
+    for i, col in enumerate(feature_cols):
+        sns.kdeplot(
+            data=df,
+            x=col,
+            hue=class_col,
+            hue_order=classes,
+            fill=True,
+            alpha=0.2,
+            palette=CATEGORICAL_PALETTE[: len(classes)],
+            ax=axes[i],
+        )
+        axes[i].set_title(col, fontsize=10)
+        axes[i].set_xlabel("")
+
+    for ax in axes[len(feature_cols):]:
+        ax.axis("off")
+
+    if title is not None:
+        fig.suptitle(title, y=1.02)
+
+    fig.tight_layout()
+    return fig
+

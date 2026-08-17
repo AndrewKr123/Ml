@@ -1,0 +1,70 @@
+{
+  "baseline": {
+    "accuracy": 0.9333333333333333,
+    "f1_macro": 0.9333333333333332,
+    "precision_macro": 0.9333333333333332,
+    "recall_macro": 0.9333333333333332,
+    "roc_auc_ovr": 0.9883333333333333
+  },
+  "final_lr": {
+    "accuracy": 0.9666666666666667,
+    "f1_macro": 0.9665831244778612,
+    "precision_macro": 0.9696969696969697,
+    "recall_macro": 0.9666666666666667,
+    "roc_auc_ovr": 1.0
+  },
+  "svm_linear": {
+    "accuracy": 1.0,
+    "f1_macro": 1.0,
+    "precision_macro": 1.0,
+    "recall_macro": 1.0,
+    "roc_auc_ovr": 1.0
+  },
+  "svm_rbf": {
+    "accuracy": 0.9666666666666667,
+    "f1_macro": 0.9665831244778612,
+    "precision_macro": 0.9696969696969697,
+    "recall_macro": 0.9666666666666667,
+    "roc_auc_ovr": 1.0
+  },
+  "decision_tree": {
+    "accuracy": 0.9666666666666667,
+    "f1_macro": 0.9665831244778612,
+    "precision_macro": 0.9696969696969697,
+    "recall_macro": 0.9666666666666667,
+    "roc_auc_ovr": 0.9716666666666667
+  },
+  "best_params_lr": {
+    "model__C": 10,
+    "pca": "passthrough"
+  },
+  "best_params_svm_linear": {
+    "model__C": 3,
+    "pca": "passthrough"
+  },
+  "best_params_svm_rbf": {
+    "model__C": 10,
+    "model__gamma": 0.1,
+    "pca": "passthrough"
+  },
+  "best_params_decision_tree": {
+    "model__class_weight": null,
+    "model__criterion": "gini",
+    "model__max_depth": 3,
+    "model__min_samples_leaf": 1,
+    "model__min_samples_split": 2,
+    "pca": "passthrough"
+  },
+  "cv_accuracy_lr": 0.9666666666666668,
+  "cv_accuracy_svm_linear": 0.975,
+  "cv_accuracy_svm_rbf": 0.975,
+  "cv_accuracy_decision_tree": 0.9583333333333334,
+  "pca_search": true,
+  "target_names": [
+    "setosa",
+    "versicolor",
+    "virginica"
+  ],
+  "test_size": 0.2,
+  "random_state": 42
+}

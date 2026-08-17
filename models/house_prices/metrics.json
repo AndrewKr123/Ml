@@ -11,8 +11,19 @@
     "mape_pct": 9.39054757902991,
     "r2": 0.8960058879116531
   },
+  "decision tree": {
+    "mae": 22894.40927401717,
+    "rmse": 36688.19351419471,
+    "mape_pct": 13.274913865483109,
+    "r2": 0.8245154760075563
+  },
   "best_alpha": 30,
   "cv_rmse_log": 0.1298041141505272,
+  "best params for tree": {
+    "model__max_depth": null,
+    "model__min_samples_leaf": 8,
+    "model__min_samples_split": 20
+  },
   "test_size": 0.2,
   "random_state": 42
 }

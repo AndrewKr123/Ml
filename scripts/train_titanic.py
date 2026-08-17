@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 
 from src.evaluation import classification_metrics, print_metrics, save_json
@@ -114,7 +115,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         svm_rbf_param_grid,
         scoring="roc_auc",
         cv=cv,
-        n_jobs=-1,
+        n_jobs=-1
     )
     svm_rbf_grid.fit(train_fe, train_fe["Survived"])
 
@@ -128,12 +129,50 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         f"SVM RBF (best params={svm_rbf_grid.best_params_})", svm_rbf_metrics
     )
 
+    
+    # ================= Decision Tree =================
+    dt_pipeline = build_final_pipeline( DecisionTreeClassifier(random_state=random_state))
+    dt_param_grid = {
+    "model__criterion": ["gini", "entropy"],
+    "model__max_depth": [2, 3, 4, 5, 6, 7, 8, None],
+    "model__min_samples_split": [2, 5, 10, 20],
+    "model__min_samples_leaf": [1, 2, 4, 8],
+    "model__class_weight": [None, "balanced"],
+    }
+
+    dt_grid = GridSearchCV(
+        dt_pipeline,
+        dt_param_grid,
+        scoring="roc_auc",
+        cv=cv,
+        n_jobs=-1
+    )
+
+    dt_grid.fit(train_fe, train_fe["Survived"])
+    dt_model = dt_grid.best_estimator_
+    dt_pred = dt_model.predict(holdout_fe)
+    dt_prob = dt_model.predict_proba(holdout_fe)[:, 1]
+
+    dt_metrics = classification_metrics(
+        holdout_fe["Survived"],
+        dt_pred,
+        dt_prob
+    )
+
+    print_metrics(
+        f"Decision Tree (best params={dt_grid.best_params_})",
+        dt_metrics
+    )
+
+    #------
+
     print("\n=== СРАВНЕНИЕ ВСЕХ МОДЕЛЕЙ (hold-out test) ===")
     models_comp = {
         "Baseline (LR)": baseline_metrics,
         "Final (LR)": final_metrics,
         "SVM (Linear)": svm_lin_metrics,
         "SVM (RBF)": svm_rbf_metrics,
+        "Decision Tree": dt_metrics
     }
     for m_name, m_metrics in models_comp.items():
         print(
@@ -144,17 +183,22 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
     joblib.dump(final_model, MODELS_DIR / "model.joblib")
+    joblib.dump(svm_rbf_model, MODELS_DIR / "svm_rbf.joblib")
+    joblib.dump(dt_model, MODELS_DIR / "decision_tree_model.joblib")
     save_json(
         {
             "baseline": baseline_metrics,
             "final_lr": final_metrics,
             "svm_linear": svm_lin_metrics,
             "svm_rbf": svm_rbf_metrics,
+            "dt_metrics": dt_metrics,
             "best_C_lr": grid.best_params_["model__C"],
             "best_params_svm_linear": svm_lin_grid.best_params_,
             "best_params_svm_rbf": svm_rbf_grid.best_params_,
+            "best_params_dt": dt_grid.best_params_,
             "cv_roc_auc_lr": grid.best_score_,
             "cv_roc_auc_svm_rbf": svm_rbf_grid.best_score_,
+            "cv_roc_auc_dt": dt_grid.best_score_,
             "test_size": test_size,
             "random_state": random_state,
         },

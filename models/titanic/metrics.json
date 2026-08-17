@@ -27,6 +27,13 @@
     "f1": 0.768,
     "roc_auc": 0.8557312252964426
   },
+  "dt_metrics": {
+    "accuracy": 0.8212290502793296,
+    "precision": 0.7681159420289855,
+    "recall": 0.7681159420289855,
+    "f1": 0.7681159420289855,
+    "roc_auc": 0.8509222661396576
+  },
   "best_C_lr": 0.3,
   "best_params_svm_linear": {
     "model__C": 0.01
@@ -35,8 +42,16 @@
     "model__C": 1,
     "model__gamma": 0.1
   },
+  "best_params_dt": {
+    "model__class_weight": "balanced",
+    "model__criterion": "entropy",
+    "model__max_depth": 4,
+    "model__min_samples_leaf": 4,
+    "model__min_samples_split": 2
+  },
   "cv_roc_auc_lr": 0.875898338135799,
   "cv_roc_auc_svm_rbf": 0.8739242081209166,
+  "cv_roc_auc_dt": 0.8669258282933832,
   "test_size": 0.2,
   "random_state": 42
 }

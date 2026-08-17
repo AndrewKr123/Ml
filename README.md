@@ -13,28 +13,35 @@
 Ml/
 ├── data/
 │   ├── titanic/{raw,processed}/          сырые и предобработанные данные Titanic
+│   ├── iris/preprocess                    предобработанные данные Iris
 │   └── house_prices/{raw,processed}/     сырые и предобработанные данные House Prices
 ├── notebooks/
 │   ├── 01_titanic_eda.ipynb              EDA + обоснование feature engineering (Titanic)
 │   └── 02_house_prices_eda.ipynb         EDA + обоснование feature engineering (House Prices)
 ├── scripts/
 │   ├── download_data.py                  скачивание raw-данных через Kaggle API
+│   ├── train_iris.py                     полный пайплайн: baseline → CV → final → метрики
 │   ├── train_titanic.py                  полный пайплайн: baseline → CV → final → метрики
 │   └── train_house_prices.py             полный пайплайн: baseline → CV → final → метрики
 ├── src/
 │   ├── titanic_preprocessing.py          очистка/инженерия признаков + sklearn-пайплайны (Titanic)
 │   ├── house_prices_preprocessing.py     очистка/инженерия признаков + sklearn-пайплайны (House Prices)
+│   ├── iris_preprocessing.py             очистка/инженерия признаков + sklearn-пайплайн(Iris)
 │   └── evaluation.py                     общие метрики/отчёты для обеих задач
 ├── utils/
 │   └── plotting.py                       все графические функции проекта (единый стиль)
 ├── models/
 │   ├── titanic/{model.joblib,metrics.json,submission.csv,plots/}
 │   └── house_prices/{model.joblib,metrics.json,submission.csv,plots/}
+│   └──iris/{model.joblib,metrics.json,submission.csv,plots/}
 ├── tutorials/
 │   ├── linearregression.ipynb            теория линейной регрессии с нуля
 │   ├── logisticregression.ipynb          теория логистической регрессии с нуля
-│   └── svm.ipynb                         теория метода опорных векторов с нуля
-├── questions.md                          конспект вопросов к собеседованию (линейная регрессия)
+│   ├── svm.ipynb                         теория метода опорных векторов с нуля
+│   └── decisiontree.ipynb                теория по деревьям решений с нуля
+├── questions/
+│   ├── questions_linearregression.md     вопросы по линейной регрессии
+│   └── questions_logisticregression.md   вопросы по логистической регрессии
 ├── pyproject.toml
 └── requirements.txt
 ```
@@ -79,6 +86,7 @@ pip install -e .                 # делает src/ и utils/ импортир�
 ```bash
 jupyter lab notebooks/01_titanic_eda.ipynb
 jupyter lab notebooks/02_house_prices_eda.ipynb
+jupiter lab notebooks/03_iris_eda.ipynb
 ```
 
 Здесь разведочный анализ с объяснением, почему принято то или иное решение
@@ -178,6 +186,67 @@ python scripts/train_titanic.py --test-size 0.25 --random-state 0
 | R² | 0.823 | 0.896 | +0.073 |
 
 Лучшая `alpha` по кросс-валидации: `30` (CV RMSE на log-таргете = 0.130). Подробности решений (включая разбор мультиколлинеарности через VIF) — `notebooks/02_house_prices_eda.ipynb`; код — `src/house_prices_preprocessing.py`; диагностические графики (residuals, predicted vs actual, коэффициенты модели) — `models/house_prices/plots/`.
+
+## Iris — многоклассовая классификация сортов ириса
+
+**Baseline** (`LogisticRegression`): стандартная логистическая регрессия с дефолтными параметрами (`C=1`, L2-регуляризация) на четырёх числовых признаках (`sepal_length`, `sepal_width`, `petal_length`, `petal_width`) без масштабирования и снижения размерности — то, что сделал бы новичок в первый день.
+
+**Final (LR + PCA search)**: логистическая регрессия с L2-регуляризацией внутри `Pipeline` (`RobustScaler` → опционально `PCA` → модель), подбор `C` и наличия PCA через `GridSearchCV` + `StratifiedKFold` (5 фолдов, метрика accuracy). По результатам поиска PCA не улучшил качество, лучшая конфигурация — без снижения размерности.
+
+**SVM (Linear)**: линейный метод опорных векторов на масштабированных признаках с опциональным PCA, подбор `C`.
+**SVM (RBF)**: метод опорных векторов с радиально-базисным ядром для учёта нелинейных границ, подбор `C` и `gamma`.
+**Decision Tree**: дерево решений с подбором глубины, минимального размера листа/узла, критерия разбиения и весов классов.
+
+Метрики на одном и том же hold-out сплите (20% от датасета, 30 объектов), воспроизводятся командой `python scripts/train_iris.py`:
+
+| Метрика | Baseline | Final LR | Δ (Final) | SVM Linear | Δ (SVM Lin) | SVM RBF | Δ (SVM RBF) | Decision Tree | Δ (DT) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Accuracy | 0.9333 | 0.9667 | +0.033 | **1.0000** | **+0.067** | 0.9667 | +0.033 | 0.9667 | +0.033 |
+| F1 Macro | 0.9333 | 0.9666 | +0.033 | **1.0000** | **+0.067** | 0.9666 | +0.033 | 0.9666 | +0.033 |
+| Precision Macro | 0.9333 | 0.9697 | +0.036 | **1.0000** | **+0.067** | 0.9697 | +0.036 | 0.9697 | +0.036 |
+| Recall Macro | 0.9333 | 0.9667 | +0.033 | **1.0000** | **+0.067** | 0.9667 | +0.033 | 0.9667 | +0.033 |
+| ROC-AUC OVR | 0.9883 | **1.0000** | +0.012 | **1.0000** | +0.012 | **1.0000** | +0.012 | 0.9717 | −0.017 |
+
+Hold-out содержит всего 30 объектов; одна ошибка меняет accuracy на ±0.033. Для надёжного сравнения ориентируйтесь на CV-score.
+
+### Результаты кросс-валидации (5-fold StratifiedKFold, accuracy)
+
+| Модель | CV Accuracy | Holdout Accuracy |
+| --- | --- | --- |
+| Final LR | 0.9667 | 0.9667 |
+| **SVM Linear** | **0.9750** | **1.0000** |
+| **SVM RBF** | **0.9750** | 0.9667 |
+| Decision Tree | 0.9583 | 0.9667 |
+
+Лучшие гиперпараметры по кросс-валидации:
+- **Final LR**: `C = 10`, `pca = passthrough` (PCA не выбран)
+- **SVM Linear**: `C = 3`, `pca = passthrough`
+- **SVM RBF**: `C = 10`, `gamma = 0.1`, `pca = passthrough`
+- **Decision Tree**: `criterion = gini`, `max_depth = 3`, `min_samples_leaf = 1`, `min_samples_split = 2`, `class_weight = None`, `pca = passthrough`
+
+Подробности EDA — `notebooks/02_iris_eda.ipynb`; код предобработки — `src/iris_preprocessing.py`; диагностические графики (confusion matrix, ROC-кривые OVR) — `models/iris/plots/`.
+
+---
+
+### Анализ результатов
+
+**PCA не дал преимущества ни для одной модели.** Все лучшие конфигурации выбрали `passthrough`. Для Iris с 4 информативными признаками снижение размерности через PCA (неконтролируемый метод) скорее теряет направление, важное для разделения классов, чем убирает шум. Мультиколлинеарность между `petal_length` и `petal_width` (~0.96) не мешает предсказаниям: L2-регуляризация стабилизирует веса, а сами признаки сильно разделяют классы.
+
+**SVM Linear показал лучший CV-score (0.975) и идеальный holdout (1.0).** Линейная разделяющая поверхность достаточна для Iris; после `RobustScaler` SVM эффективно строит гиперплоскости между тремя классами. Идеальная точность на holdout частично обусловлена малым размером теста (30 объектов), но высокий CV подтверждает устойчивость.
+
+**Final LR и SVM RBF показали одинаковый holdout (0.9667)**, но SVM RBF имеет более высокий CV (0.975 vs 0.967). RBF-ядро не дало преимущества перед линейным, что подтверждает линейную разделимость данных.
+
+**Decision Tree оказался слабее всех по CV (0.958).** Одиночное дерево строит ось-параллельные разбиения и хуже аппроксимирует гладкие границы между `versicolor` и `virginica`. Для улучшения нужны ансамбли (Random Forest, Gradient Boosting).
+
+### Итог
+
+- **SVM Linear** — лучший выбор по совокупности CV и holdout; простая, быстрая, интерпретируемая модель.
+- **Final LR** — лучший выбор, если нужны калиброванные вероятности и ROC-AUC; уступает SVM по CV лишь на 0.008.
+- **SVM RBF** — сопоставима с LR, но сложнее и не даёт выигрыша над линейным вариантом.
+- **Decision Tree** — подходит как baseline или для интерпретации правил, но проигрывает линейным моделям.
+- **PCA** — не нужен для предсказания на Iris; полезен только для визуализации (2D-проекция).
+
+
 
 ## Теория и справочные материалы
 
