@@ -1,15 +1,14 @@
-"""Полный пайплайн Iris: baseline vs итоговые модели.
+"""
+Полный пайплайн Iris: baseline vs итоговые модели.
 
 train -> hold-out test сплит -> baseline LogisticRegression ->
-final LogisticRegression с CV и опциональным поиском PCA ->
+final LogisticRegression с CV -> LogisticRegression без регуляризации ->
 SVM Linear / SVM RBF / DecisionTree -> метрики на hold-out ->
 сохранение модели/метрик/графиков в models/iris/.
 
 Запуск:
     python scripts/train_iris.py
 
-Отключить поиск PCA:
-    python scripts/train_iris.py --no-pca-search
 """
 
 from __future__ import annotations
@@ -26,7 +25,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -122,29 +120,6 @@ TARGET_NAMES = [
     "versicolor",
     "virginica",
 ]
-
-
-def _json_safe_params(params: dict) -> dict:
-    """
-    GridSearchCV может вернуть в best_params_ объект PCA.
-    Такой объект нельзя напрямую сериализовать в JSON, поэтому делаем безопасное представление.
-    """
-    safe = {}
-
-    for key, value in params.items():
-        if isinstance(value, PCA):
-            safe[key] = f"PCA(n_components={value.n_components})"
-        elif isinstance(value, (np.integer,)):
-            safe[key] = int(value)
-        elif isinstance(value, (np.floating,)):
-            safe[key] = float(value)
-        elif value is None:
-            safe[key] = None
-        else:
-            safe[key] = value
-
-    return safe
-
 
 def classification_metrics_multiclass(
     y_true: np.ndarray | pd.Series,
@@ -242,60 +217,17 @@ def plot_multiclass_roc(
 
     return ax
 
-
-def with_pca_options(param_grid: dict) -> list[dict]:
-    """
-    Делает список сеток для GridSearchCV:
-    1. PCA выключен через 'passthrough'
-    2. PCA включён с разными n_components
-    """
-    return [
-        {
-            "pca": ["passthrough"],
-            **param_grid,
-        },
-        {
-            "pca": [
-                PCA(n_components=2),
-                PCA(n_components=0.95),
-                PCA(n_components=3),
-                PCA(n_components=4),
-                PCA(n_components=1.5)
-            ],
-            **param_grid,
-        },
-    ]
-
-
 def make_pipeline_and_grid(
     model,
     param_grid: dict,
-    pca_search: bool,
 ):
     """
     Собирает пайплайн и сетку параметров.
-
-    Если pca_search=True:
-        - в пайплайн добавляется шаг pca;
-        - GridSearchCV будет сравнивать PCA и вариант без PCA.
-
-    Если pca_search=False:
-        - пайплайн без PCA;
-        - сетка параметров остаётся обычной.
     """
-    if pca_search:
-        pipeline = build_iris_pipeline(
-            model,
-            use_pca=True,
-            pca_components=None,
-        )
-        grid = with_pca_options(param_grid)
-    else:
-        pipeline = build_iris_pipeline(
-            model,
-            use_pca=False,
-        )
-        grid = param_grid
+    pipeline = build_iris_pipeline(
+        model,
+    )
+    grid = param_grid
 
     return pipeline, grid
 
@@ -303,7 +235,6 @@ def make_pipeline_and_grid(
 def run(
     test_size: float = 0.2,
     random_state: int = 42,
-    pca_search: bool = True,
 ) -> None:
     set_style()
 
@@ -334,7 +265,6 @@ def run(
     # ================= BASELINE =================
     baseline_model = build_iris_pipeline(
         LogisticRegression(max_iter=1000, random_state=random_state),
-        use_pca=False,
     )
 
     baseline_model.fit(X_train, y_train)
@@ -349,7 +279,7 @@ def run(
     )
 
     print_metrics(
-        "BASELINE: LogisticRegression без PCA",
+        "BASELINE: LogisticRegression",
         baseline_metrics,
     )
 
@@ -357,7 +287,6 @@ def run(
     lr_pipeline, lr_grid = make_pipeline_and_grid(
         LogisticRegression(max_iter=1000, random_state=random_state),
         {"model__C": C_GRID},
-        pca_search=pca_search,
     )
 
     lr_search = GridSearchCV(
@@ -373,7 +302,7 @@ def run(
     print(
         f"\nЛучшие параметры LogisticRegression по CV "
         f"(accuracy={lr_search.best_score_:.4f}): "
-        f"{_json_safe_params(lr_search.best_params_)}"
+        f"{lr_search.best_params_}"
     )
 
     final_model = lr_search.best_estimator_
@@ -388,8 +317,7 @@ def run(
     )
 
     print_metrics(
-        "FINAL: LogisticRegression + CV"
-        + (" + PCA search" if pca_search else ""),
+        "FINAL: LogisticRegression + CV",
         final_metrics,
     )
 
@@ -405,54 +333,10 @@ def run(
             f"(delta {final_value - base_value:+.4f})"
         )
 
-    # ================= LogisticRegression без Ridge + PCA search =================
-    lr_no_ridge_pipeline, lr_no_ridge_grid = make_pipeline_and_grid(
-        LogisticRegression(
-            penalty=None,
-            max_iter=1000,
-            random_state=random_state,
-        ),
-        {},
-        pca_search=pca_search,
-    )
-
-    lr_no_ridge_search = GridSearchCV(
-        lr_no_ridge_pipeline,
-        lr_no_ridge_grid,
-        scoring="accuracy",
-        cv=cv,
-        n_jobs=-1,
-    )
-
-    lr_no_ridge_search.fit(X_train, y_train)
-
-    print(
-        f"\nЛучшие параметры LogisticRegression без Ridge"
-        f" (CV accuracy={lr_no_ridge_search.best_score_:.4f}): "
-        f"{_json_safe_params(lr_no_ridge_search.best_params_)}"
-    )
-
-    lr_no_ridge_model = lr_no_ridge_search.best_estimator_
-
-    lr_no_ridge_pred = lr_no_ridge_model.predict(X_holdout)
-    lr_no_ridge_prob = lr_no_ridge_model.predict_proba(X_holdout)
-
-    lr_no_ridge_metrics = classification_metrics_multiclass(
-        y_holdout,
-        lr_no_ridge_pred,
-        lr_no_ridge_prob,
-    )
-
-    print_metrics(
-        "LogisticRegression без Ridge"
-        + (" + PCA search" if pca_search else ""),
-        lr_no_ridge_metrics,
-    )
     # ================= SVM Linear =================
     svm_lin_pipeline, svm_lin_grid = make_pipeline_and_grid(
         SVC(kernel="linear", probability=True, random_state=random_state),
         {"model__C": C_GRID},
-        pca_search=pca_search,
     )
 
     svm_lin_search = GridSearchCV(
@@ -476,7 +360,7 @@ def run(
     )
 
     print_metrics(
-        f"SVM Linear (best params={_json_safe_params(svm_lin_search.best_params_)})",
+        f"SVM Linear",
         svm_lin_metrics,
     )
 
@@ -487,7 +371,6 @@ def run(
             "model__C": C_GRID,
             "model__gamma": ["scale", "auto", 0.001, 0.01, 0.1, 1.0],
         },
-        pca_search=pca_search,
     )
 
     svm_rbf_search = GridSearchCV(
@@ -511,14 +394,14 @@ def run(
     )
 
     print_metrics(
-        f"SVM RBF (best params={_json_safe_params(svm_rbf_search.best_params_)})",
+        f"SVM RBF",
         svm_rbf_metrics,
     )
 
     # ================= Decision Tree =================
     dt_param_grid = {
         "model__criterion": ["gini", "entropy"],
-        "model__max_depth": [2, 3, 4, 5, 6, 7, 8, None],
+        "model__max_depth": [2, 3, 4, 5, 6, 7, 8,10,15,20,25,30, None],
         "model__min_samples_split": [2, 5, 10, 20],
         "model__min_samples_leaf": [1, 2, 4, 8],
         "model__class_weight": [None, "balanced"],
@@ -527,7 +410,6 @@ def run(
     dt_pipeline, dt_grid = make_pipeline_and_grid(
         DecisionTreeClassifier(random_state=random_state),
         dt_param_grid,
-        pca_search=pca_search,
     )
 
     dt_search = GridSearchCV(
@@ -551,7 +433,7 @@ def run(
     )
 
     print_metrics(
-        f"Decision Tree (best params={_json_safe_params(dt_search.best_params_)})",
+        f"Decision Tree",
         dt_metrics,
     )
 
@@ -592,15 +474,10 @@ def run(
             "svm_linear": svm_lin_metrics,
             "svm_rbf": svm_rbf_metrics,
             "decision_tree": dt_metrics,
-            "best_params_lr": _json_safe_params(lr_search.best_params_),
-            "best_params_svm_linear": _json_safe_params(svm_lin_search.best_params_),
-            "best_params_svm_rbf": _json_safe_params(svm_rbf_search.best_params_),
-            "best_params_decision_tree": _json_safe_params(dt_search.best_params_),
             "cv_accuracy_lr": float(lr_search.best_score_),
             "cv_accuracy_svm_linear": float(svm_lin_search.best_score_),
             "cv_accuracy_svm_rbf": float(svm_rbf_search.best_score_),
             "cv_accuracy_decision_tree": float(dt_search.best_score_),
-            "pca_search": pca_search,
             "target_names": TARGET_NAMES,
             "test_size": test_size,
             "random_state": random_state,
@@ -645,54 +522,44 @@ def run(
     )
     plt.close()
 
-    # Коэффициенты логистической регрессии можно нормально рисовать,
-    # только если PCA выключен. Если PCA включён, коэффициенты живут
-    # в пространстве главных компонент, а не исходных признаков.
-    pca_step = final_model.named_steps.get("pca", "passthrough")
+        # Коэффициенты логистической регрессии в пространстве исходных признаков
+    try:
+        feature_names = final_model.named_steps["preprocess"].get_feature_names_out()
+        feature_names = [name.replace("num__", "") for name in feature_names]
 
-    if isinstance(pca_step, str) and pca_step == "passthrough":
-        try:
-            feature_names = final_model.named_steps["preprocess"].get_feature_names_out()
-            feature_names = [name.replace("num__", "") for name in feature_names]
+        coef = final_model.named_steps["model"].coef_
 
-            coef = final_model.named_steps["model"].coef_
+        if coef.ndim == 1:
+            plot_coefficients(
+                feature_names,
+                coef,
+                title="Коэффициенты LogisticRegression (Iris)",
+            )
 
-            if coef.ndim == 1:
-                plot_coefficients(
-                    feature_names,
-                    coef,
-                    title="Коэффициенты LogisticRegression (Iris)",
-                )
+            plt.savefig(
+                MODELS_DIR / "plots" / "coefficients.png",
+                dpi=120,
+                bbox_inches="tight",
+            )
+            plt.close()
+        else:
+            for i, class_name in enumerate(TARGET_NAMES):
+                if i < coef.shape[0]:
+                    plot_coefficients(
+                        feature_names,
+                        coef[i],
+                        title=f"Коэффициенты LogisticRegression: {class_name}",
+                    )
 
-                plt.savefig(
-                    MODELS_DIR / "plots" / "coefficients.png",
-                    dpi=120,
-                    bbox_inches="tight",
-                )
-                plt.close()
-            else:
-                for i, class_name in enumerate(TARGET_NAMES):
-                    if i < coef.shape[0]:
-                        plot_coefficients(
-                            feature_names,
-                            coef[i],
-                            title=f"Коэффициенты LogisticRegression: {class_name}",
-                        )
+                    plt.savefig(
+                        MODELS_DIR / "plots" / f"coefficients_{class_name}.png",
+                        dpi=120,
+                        bbox_inches="tight",
+                    )
+                    plt.close()
 
-                        plt.savefig(
-                            MODELS_DIR / "plots" / f"coefficients_{class_name}.png",
-                            dpi=120,
-                            bbox_inches="tight",
-                        )
-                        plt.close()
-
-        except Exception as e:
-            print(f"Не удалось построить график коэффициентов: {e}")
-    else:
-        print(
-            "Финальная LogisticRegression использует PCA, "
-            "поэтому коэффициенты находятся в пространстве главных компонент."
-        )
+    except Exception as e:
+        print(f"Не удалось построить график коэффициентов: {e}")
 
     # Сохраняем обработанные данные
     train_processed = X_train.copy()
@@ -750,19 +617,9 @@ if __name__ == "__main__":
         default=42,
     )
 
-    parser.add_argument(
-        "--no-pca-search",
-        dest="pca_search",
-        action="store_false",
-        help="Не искать вариант с PCA. Используется обычный пайплайн без PCA.",
-    )
-
-    parser.set_defaults(pca_search=True)
-
     args = parser.parse_args()
 
     run(
         test_size=args.test_size,
         random_state=args.random_state,
-        pca_search=args.pca_search,
     )

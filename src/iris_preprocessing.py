@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.datasets import load_iris
-from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import RobustScaler
 
@@ -135,8 +134,6 @@ def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_iris_pipeline(
     model,
-    use_pca: bool = False,
-    pca_components: int | float | None = None,
 ) -> Pipeline:
     """
     Строит пайплайн предобработки для Iris.
@@ -144,13 +141,6 @@ def build_iris_pipeline(
     Параметры:
     model:
         sklearn-совместимый классификатор.
-    use_pca:
-        включать ли PCA.
-    pca_components:
-        количество компонент или доля дисперсии:
-        - None: все компоненты;
-        - int: точное число компонент, например 2;
-        - float: доля дисперсии, например 0.95.
     """
     numeric_transformer = Pipeline([
         ("scale", RobustScaler()),
@@ -165,27 +155,15 @@ def build_iris_pipeline(
 
     steps = [("preprocess", preprocessor)]
 
-    if use_pca:
-        steps.append(("pca", PCA(n_components=pca_components)))
-
     steps.append(("model", model))
 
     return Pipeline(steps)
 
 
-def build_baseline_pipeline(model) -> Pipeline:
-    """Базовый пайплайн без PCA."""
-    return build_iris_pipeline(model, use_pca=False)
-
-
 def build_final_pipeline(
     model,
-    use_pca: bool = False,
-    pca_components: int | float | None = None,
 ) -> Pipeline:
     """Финальный пайплайн для Iris."""
     return build_iris_pipeline(
         model=model,
-        use_pca=use_pca,
-        pca_components=pca_components,
     )
