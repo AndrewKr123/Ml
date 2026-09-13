@@ -7,6 +7,8 @@
 
 Для каждой задачи есть: разведочный анализ данных (EDA) с объяснениями, честный пайплайн обучения с baseline-моделью для сравнения, и итоговая модель с воспроизводимыми метриками. Отдельно — теоретические ноутбуки по обоим методам и конспект вопросов к собеседованию.
 
+Дополнительно в проекте есть **Iris** — многоклассовая классификация трёх видов ириса. Для классификации сравниваются логистическая регрессия, SVM и деревья решений; для House Prices — также дерево регрессии. Теоретические материалы дополнены случайным лесом и разложением ошибки на смещение и разброс (bias–variance decomposition).
+
 ## Структура репозитория
 
 ```
@@ -38,6 +40,8 @@ Ml/
 │   ├── linearregression.ipynb            теория линейной регрессии с нуля
 │   ├── logisticregression.ipynb          теория логистической регрессии с нуля
 │   ├── svm.ipynb                         теория метода опорных векторов с нуля
+│   ├── randomforest.ipynb                теория случайного леса
+│   ├── BVD.ipynb                         разложение ошибки на смещение, разброс и шум
 │   └── decisiontree.ipynb                теория по деревьям решений с нуля
 ├── questions/
 │   ├── questions_linearregression.md     вопросы по линейной регрессии
@@ -46,7 +50,22 @@ Ml/
 └── requirements.txt
 ```
 
+Дополнение к дереву выше — актуальные пути и дополнительные файлы:
+
+- `notebooks/03_iris_eda.ipynb` — EDA для Iris.
+- `data/iris/processed/{train,holdout}_processed.csv` — обучающая и отложенная части Iris; фактическое имя каталога — `processed`.
+- `models/iris/holdout_predictions.csv` — истинные и предсказанные классы Iris; вместо Kaggle submission здесь сохраняются прогнозы на hold-out.
+- `models/iris/{svm_rbf,decision_tree}.joblib` — дополнительные модели Iris.
+- `models/titanic/{svm_rbf,decision_tree_model}.joblib` — дополнительные модели Titanic.
+- `tutorials/decisiontrees.ipynb` — фактическое имя ноутбука по деревьям решений.
+- `tutorials/randomforest.ipynb` — случайный лес.
+- `tutorials/BVD.ipynb` — разложение MSE, регуляризация, деревья и ансамбли.
+
+Файл `scripts/train_iris_compact.py` пока пуст; для обучения используется `scripts/train_iris.py`.
+
 ## Установка
+
+Требуется **Python 3.10 или новее** (`requires-python` в `pyproject.toml`). Версии библиотек закреплены в `requirements.txt`; зависимости устанавливаются отдельной командой перед установкой проекта в editable-режиме.
 
 ```bash
 git clone <repo-url>
@@ -73,6 +92,8 @@ pip install -e .                 # делает src/ и utils/ импортир�
 
 Обработанные датасеты (`data/*/processed/*.csv`) генерируются автоматически при запуске `scripts/train_*.py` — их не нужно готовить отдельно.
 
+**Данные Iris:** `src.iris_preprocessing.load_raw()` по очереди ищет `data/iris/raw/Iris.csv`, `iris.csv`, `train.csv`. Если CSV нет, используется встроенный `sklearn.datasets.load_iris` — Kaggle и скачивание не нужны. Загрузчик приводит названия колонок к единому формату и кодирует виды: `setosa → 0`, `versicolor → 1`, `virginica → 2`. Служебные `id`, `species`, `target` исключаются из признаков.
+
 ## Как пользоваться репозиторием
 
 Порядок ниже — от «посмотреть и понять» к «запустить самому». Все команды
@@ -97,6 +118,12 @@ jupiter lab notebooks/03_iris_eda.ipynb
 показываются и объясняются, реально используются ниже в `scripts/` —
 никакого расхождения между "тем, что объяснили" и "тем, что выполнилось".
 
+Для Iris корректная команда запуска (уточнение опечатки `jupiter` выше):
+
+```bash
+jupyter lab notebooks/03_iris_eda.ipynb
+```
+
 ### 2. Теория метода (если нужно освежить сам метод)
 
 ```bash
@@ -107,6 +134,15 @@ jupyter lab tutorials/logisticregression.ipynb
 Вывод функции потерь, градиентный спуск с нуля, регуляризация, диагностика
 модели, метрики — на синтетических данных, изолированно от конкретной
 задачи.
+
+Дополнительные теоретические ноутбуки:
+
+```bash
+jupyter lab tutorials/svm.ipynb
+jupyter lab tutorials/decisiontrees.ipynb
+jupyter lab tutorials/randomforest.ipynb
+jupyter lab tutorials/BVD.ipynb
+```
 
 ### 3. Скачивание сырых данных (опционально — они уже есть в репозитории)
 
@@ -141,6 +177,17 @@ python scripts/train_titanic.py --test-size 0.25 --random-state 0
 
 Прогонять оба скрипта не обязательно вместе — они полностью независимы.
 
+Для Iris доступен отдельный независимый запуск с теми же параметрами сплита:
+
+```bash
+python scripts/train_iris.py
+python scripts/train_iris.py --test-size 0.25 --random-state 0
+```
+
+Он сравнивает baseline LR, LR с подбором `C`, линейную и RBF SVM, дерево решений. В `models/iris/` сохраняются LR (`model.joblib`), RBF SVM (`svm_rbf.joblib`), дерево (`decision_tree.joblib`), `metrics.json`, `holdout_predictions.csv` и графики. Линейная SVM отдельно не сериализуется. В `data/iris/processed/` записываются `train_processed.csv` и `holdout_processed.csv`: исходные числовые признаки после удаления служебных колонок, с возвращёнными метками; масштабирование выполняется внутри пайплайна.
+
+Уточнение к сохранению моделей: `model.joblib` содержит выбранную LR для Titanic/Iris или Ridge для House Prices, а не автоматически лучшую из всех сравниваемых моделей. Скрипты сохраняют модель после обучения на обучающей части сплита; дополнительного обучения на всей выборке перед сохранением и формированием submission нет.
+
 ## Titanic — логистическая регрессия
 
 **Baseline** (`LogisticRegression`): только `Pclass, Sex, Age, Fare, SibSp, Parch`, без масштабирования и инженерии признаков — то, что сделал бы новичок в первый день.
@@ -170,6 +217,18 @@ python scripts/train_titanic.py --test-size 0.25 --random-state 0
  - Final (LR) лучше, если важна вероятностная оценка.
  - SVM (RBF) лучше, если нужна максимальная точность жесткой бинарной классификации (выжил / не выжил).
 
+**Дополнение: Decision Tree** (`DecisionTreeClassifier`) обучается на подготовленных признаках с подбором параметров через ту же 5-фолдовую CV по ROC-AUC. Сохранённые результаты из `models/titanic/metrics.json` (`test_size=0.2`, `random_state=42`):
+
+| Метрика | Decision Tree |
+| --- | --- |
+| Accuracy | 0.8212 |
+| Precision | 0.7681 |
+| Recall | 0.7681 |
+| F1 | 0.7681 |
+| ROC-AUC | 0.8509 |
+
+Лучшие параметры: `criterion=entropy`, `max_depth=4`, `min_samples_leaf=4`, `min_samples_split=2`, `class_weight=balanced`; CV ROC-AUC = **0.8669**. Дерево сохраняется в `models/titanic/decision_tree_model.joblib`. С учётом дерева максимальный Recall среди сохранённых результатов — **0.7681**; LR сохраняет преимущество по hold-out ROC-AUC.
+
 ## House Prices — линейная регрессия
 
 **Baseline** (`LinearRegression`): все сырые числовые колонки как есть, только медианная импутация — без кодирования категорий, без чистки мультиколлинеарности, без лог-таргета.
@@ -187,7 +246,20 @@ python scripts/train_titanic.py --test-size 0.25 --random-state 0
 
 Лучшая `alpha` по кросс-валидации: `30` (CV RMSE на log-таргете = 0.130). Подробности решений (включая разбор мультиколлинеарности через VIF) — `notebooks/02_house_prices_eda.ipynb`; код — `src/house_prices_preprocessing.py`; диагностические графики (residuals, predicted vs actual, коэффициенты модели) — `models/house_prices/plots/`.
 
+**Дополнение: Decision Tree** (`DecisionTreeRegressor`) использует подготовленные признаки и `log1p(SalePrice)`. Глубина и минимальные размеры узла/листа подбираются через `GridSearchCV` с 5-фолдовой CV по RMSE логарифма цены. После `expm1` сохранены следующие метрики (`models/house_prices/metrics.json`):
+
+| Метрика | Decision Tree |
+| --- | --- |
+| MAE | $22 894.41 |
+| RMSE | $36 688.19 |
+| MAPE | 13.27% |
+| R² | 0.825 |
+
+Лучшие параметры: `max_depth=None`, `min_samples_leaf=8`, `min_samples_split=20`. Дерево немного улучшает baseline, но уступает Ridge по всем четырём метрикам. В JSON результаты находятся под ключом `decision tree`, параметры — `best params for tree`; отдельный `.joblib` для дерева этот скрипт не сохраняет.
+
 ## Iris — многоклассовая классификация сортов ириса
+
+**Уточнение для текущего кода:** приведённое ниже описание поиска PCA относится к предыдущему варианту эксперимента. Сейчас `build_iris_pipeline()` содержит `ColumnTransformer` с `RobustScaler` и модель; шага PCA и его перебора в `scripts/train_iris.py` нет. Baseline также использует этот масштабировщик. Таблицы ниже соответствуют сохранённому `models/iris/metrics.json`; JSON не содержит лучших гиперпараметров Iris и не подтверждает прежние значения `pca`. Актуальный путь EDA — `notebooks/03_iris_eda.ipynb`.
 
 **Baseline** (`LogisticRegression`): стандартная логистическая регрессия с дефолтными параметрами (`C=1`, L2-регуляризация) на четырёх числовых признаках (`sepal_length`, `sepal_width`, `petal_length`, `petal_width`) без масштабирования и снижения размерности — то, что сделал бы новичок в первый день.
 
@@ -252,3 +324,11 @@ Hold-out содержит всего 30 объектов; одна ошибка 
 
 - `tutorials/linearregression.ipynb`, `tutorials/logisticregression.ipynb`, `tutorials/svm.ipynb` — теория методов с нуля: постановка задачи, функция потерь, аналитическое и итеративное решение, регуляризация, диагностика, метрики.
 - `questions.md` — личный конспект вопросов к собеседованию по линейной регрессии (справочный материал, не туториал).
+
+
+Дополнительные материалы и уточнение путей:
+
+- `tutorials/decisiontrees.ipynb` — энтропия, критерии разбиения, собственная реализация дерева классификации, деревья регрессии и визуализация.
+- `tutorials/randomforest.ipynb` — bootstrap, случайный выбор признаков и усреднение прогнозов деревьев.
+- `tutorials/BVD.ipynb` — вывод разложения MSE на bias², variance и шум; OLS, Ridge, Lasso, влияние глубины деревьев и ансамбли.
+- `questions/questions_linearregression.md` и `questions/questions_logisticregression.md` — фактические пути конспектов вопросов по двум видам регрессии.
