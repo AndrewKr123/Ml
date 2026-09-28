@@ -13,6 +13,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.preprocessing import label_binarize
 
 # Фиксированный порядок категориальных цветов (не переставлять — порядок
 # подобран так, чтобы соседние цвета были различимы при дальтонизме).
@@ -441,3 +442,109 @@ def plot_kde_by_class(
     fig.tight_layout()
     return fig
 
+
+
+def plot_multiclass_confusion_matrix(
+    y_true,
+    y_pred,
+    labels=None,
+    normalize: bool = False,
+    title: str = "Матрица ошибок",
+    ax=None,
+):
+    unique_labels = np.unique(np.hstack([np.asarray(y_true), np.asarray(y_pred)]))
+
+    cm = confusion_matrix(y_true, y_pred, labels=unique_labels)
+
+    if normalize:
+        row_sums = cm.sum(axis=1)[:, None]
+        row_sums = np.where(row_sums == 0, 1, row_sums)
+        cm_plot = cm.astype("float") / row_sums
+        fmt = ".2f"
+    else:
+        cm_plot = cm
+        fmt = "d"
+
+    if labels is None:
+        labels = unique_labels
+
+    fig, ax = (None, ax) if ax is not None else plt.subplots(
+        figsize=(0.65 * len(labels) + 2.5, 0.65 * len(labels) + 2.2)
+    )
+
+    sns.heatmap(
+        cm_plot,
+        annot=True,
+        fmt=fmt,
+        cmap="Blues",
+        cbar=False,
+        ax=ax,
+        xticklabels=list(labels),
+        yticklabels=list(labels),
+        linewidths=0.5,
+        linecolor="white",
+    )
+
+    ax.set_xlabel("Предсказано")
+    ax.set_ylabel("Реально")
+    ax.set_title(title)
+
+    return ax
+
+def plot_multiclass_roc(
+    y_true: np.ndarray | pd.Series,
+    y_prob: np.ndarray,
+    target_names: list[str],
+    ax=None,
+):
+    """
+    Строит ROC-кривые one-vs-rest для многоклассовой классификации.
+    """
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob)
+
+    classes = np.arange(y_prob.shape[1])
+    y_bin = label_binarize(y_true, classes=classes)
+
+    # На случай, если класс вдруг один/два
+    if y_bin.shape[1] == 1:
+        y_bin = np.hstack([1 - y_bin, y_bin])
+
+    n_classes = y_bin.shape[1]
+
+    fpr = {}
+    tpr = {}
+    roc_auc = {}
+
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_bin[:, i], y_prob[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_bin.ravel(), y_prob.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+    fig, ax = (None, ax) if ax is not None else plt.subplots(figsize=(6, 5))
+
+    ax.plot(
+        fpr["micro"],
+        tpr["micro"],
+        label=f"micro-average (AUC = {roc_auc['micro']:.3f})",
+        linewidth=2,
+    )
+
+    for i in range(n_classes):
+        class_name = target_names[i] if i < len(target_names) else str(i)
+        ax.plot(
+            fpr[i],
+            tpr[i],
+            linestyle="--",
+            label=f"{class_name} (AUC = {roc_auc[i]:.3f})",
+        )
+
+    ax.plot([0, 1], [0, 1], color="gray", linestyle=":")
+    ax.set_xlabel("False Positive Rate")
+    ax.set_ylabel("True Positive Rate")
+    ax.set_title("ROC-кривые (one-vs-rest)")
+    ax.legend(fontsize=8)
+
+    return ax

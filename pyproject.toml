@@ -9,4 +9,4 @@ description = "Учебный проект: линейная регрессия 
 requires-python = ">=3.10"
 
 [tool.setuptools]
-packages = ["src", "utils"]
+packages = ["src", "src.experiments", "src.reporting", "utils"]

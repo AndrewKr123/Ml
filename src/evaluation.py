@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -71,3 +72,25 @@ def save_json(payload: dict[str, Any], path: str | Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def classification_metrics_multiclass(
+    y_true: np.ndarray | pd.Series,
+    y_pred: np.ndarray | pd.Series,
+    y_prob: np.ndarray | None = None,
+) -> dict:
+    """Метрики многоклассовой классификации; y_prob имеет форму (объекты, классы)."""
+    metrics = {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "precision_macro": float(precision_score(y_true, y_pred, average="macro", zero_division=0)),
+        "recall_macro": float(recall_score(y_true, y_pred, average="macro", zero_division=0)),
+    }
+    if y_prob is not None:
+        try:
+            metrics["roc_auc_ovr"] = float(
+                roc_auc_score(y_true, y_prob, multi_class="ovr", average="macro")
+            )
+        except ValueError:
+            metrics["roc_auc_ovr"] = None
+    return metrics

@@ -19,17 +19,21 @@ Ml/
 │   └── house_prices/{raw,processed}/     сырые и предобработанные данные House Prices
 ├── notebooks/
 │   ├── 01_titanic_eda.ipynb              EDA + обоснование feature engineering (Titanic)
-│   └── 02_house_prices_eda.ipynb         EDA + обоснование feature engineering (House Prices)
+│   ├── 02_house_prices_eda.ipynb         EDA + обоснование feature engineering (House Prices)
+│   └── 03_iris_eda.ipynb                 EDA для многоклассовой классификации (Iris)
 ├── scripts/
 │   ├── download_data.py                  скачивание raw-данных через Kaggle API
 │   ├── train_iris.py                     полный пайплайн: baseline → CV → final → метрики
 │   ├── train_titanic.py                  полный пайплайн: baseline → CV → final → метрики
-│   └── train_house_prices.py             полный пайплайн: baseline → CV → final → метрики
+│   └── train_house_prices.py             полный пайплайн: baseline → CV → метрики → отчёт
 ├── src/
 │   ├── titanic_preprocessing.py          очистка/инженерия признаков + sklearn-пайплайны (Titanic)
 │   ├── house_prices_preprocessing.py     очистка/инженерия признаков + sklearn-пайплайны (House Prices)
 │   ├── iris_preprocessing.py             очистка/инженерия признаков + sklearn-пайплайн(Iris)
-│   └── evaluation.py                     общие метрики/отчёты для обеих задач
+│   ├── evaluation.py                     метрики регрессии, бинарной и многоклассовой классификации
+│   ├── experiments/                      обучение: iris.py, titanic.py, house_prices.py
+│   │   └── result.py                     TrainingResult: модель, метрики, предсказания и CV
+│   └── reporting/                        сохранение артефактов отдельно для каждого датасета
 ├── utils/
 │   └── plotting.py                       все графические функции проекта (единый стиль)
 ├── models/
@@ -42,13 +46,31 @@ Ml/
 │   ├── svm.ipynb                         теория метода опорных векторов с нуля
 │   ├── randomforest.ipynb                теория случайного леса
 │   ├── BVD.ipynb                         разложение ошибки на смещение, разброс и шум
-│   └── decisiontree.ipynb                теория по деревьям решений с нуля
+│   ├── decisiontrees.ipynb               теория и практика деревьев решений
+│   └── gradientboosting.ipynb            градиентный бустинг над деревьями: антиградиент, потери и псевдоостатки
 ├── questions/
 │   ├── questions_linearregression.md     вопросы по линейной регрессии
 │   └── questions_logisticregression.md   вопросы по логистической регрессии
 ├── pyproject.toml
 └── requirements.txt
 ```
+
+Обучающий код читается в следующем порядке:
+
+1. `scripts/train_<dataset>.py` — загрузка, общий train/holdout-сплит, подготовка данных, запуск моделей и сравнение.
+2. `src/experiments/<dataset>.py` — явные `Pipeline`, сетки параметров и `GridSearchCV`. Функции `train_baseline`, `train_logistic_cv`, `train_ridge_cv`, `train_svm_*_cv`, `train_decision_tree_cv` возвращают `TrainingResult`.
+3. `src/reporting/<dataset>.py` — сохранение моделей, метрик, таблиц и графиков; функции построения графиков находятся в `utils/plotting.py`.
+
+У результата доступны `model`, `metrics`, `predictions`, `probabilities` и `search`.
+У baseline `search=None`, у регрессии `probabilities=None`. Для House Prices
+`predictions` уже выражены в долларах, хотя сама модель предсказывает `log1p(SalePrice)`.
+Общий препроцессор и логарифм target готовятся до обучения Ridge и дерева;
+каждая модель получает свою копию препроцессора и может обучаться независимо.
+Параметр `n_jobs` функций с CV позволяет ограничить параллелизм (по умолчанию `-1`).
+
+Команды запуска и имена артефактов сохранены. Название `final` в старых ключах
+JSON и отчётах обозначает LogisticRegression/Ridge с CV, а не автоматический
+выбор победителя среди всех моделей.
 
 Дополнение к дереву выше — актуальные пути и дополнительные файлы:
 
