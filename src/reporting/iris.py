@@ -27,6 +27,7 @@ def save_report(
     svm_linear: TrainingResult,
     svm_rbf: TrainingResult,
     tree: TrainingResult,
+    boost: TrainingResult,
     models_dir: Path,
     processed_dir: Path,
     test_size: float,
@@ -40,6 +41,7 @@ def save_report(
     joblib.dump(lr.model, models_dir / "model.joblib")
     joblib.dump(svm_rbf.model, models_dir / "svm_rbf.joblib")
     joblib.dump(tree.model, models_dir / "decision_tree.joblib")
+    joblib.dump(boost.model, models_dir / "xgboost.joblib")
 
     save_json(
         {
@@ -48,10 +50,13 @@ def save_report(
             "svm_linear": svm_linear.metrics,
             "svm_rbf": svm_rbf.metrics,
             "decision_tree": tree.metrics,
+            "xgboost": boost.metrics,
             "cv_accuracy_lr": float(lr.search.best_score_),
             "cv_accuracy_svm_linear": float(svm_linear.search.best_score_),
             "cv_accuracy_svm_rbf": float(svm_rbf.search.best_score_),
             "cv_accuracy_decision_tree": float(tree.search.best_score_),
+            "cv_accuracy_xgboost": float(boost.search.best_score_),
+            "best_params_xgboost": boost.search.best_params_,
             "target_names": TARGET_NAMES,
             "test_size": test_size,
             "random_state": random_state,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from catboost import CatBoostClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
@@ -124,4 +125,41 @@ def train_decision_tree_cv(
     print_metrics(f"Decision Tree (best params={grid.best_params_})", metrics)
     return TrainingResult(
         model=model, metrics=metrics, predictions=pred, probabilities=prob, search=grid
+    )
+
+
+def train_catboost_cv(
+    train_fe: pd.DataFrame,
+    holdout_fe: pd.DataFrame,
+    cv: StratifiedKFold,
+    random_state: int,
+    *,
+    n_jobs: int = -1,
+) -> TrainingResult:
+    """Подбирает CatBoost для бинарной классификации Titanic."""
+    pipeline = build_final_pipeline(
+        CatBoostClassifier(
+            loss_function="Logloss",
+            eval_metric="AUC",
+            verbose=False,
+            allow_writing_files=False,
+            random_seed=random_state,
+            thread_count=1,
+        )
+    )
+    params = {
+        "model__iterations": [150, 300],
+        "model__depth": [3, 5, 7],
+        "model__learning_rate": [0.03, 0.1],
+        "model__l2_leaf_reg": [3, 7],
+    }
+    search = GridSearchCV(pipeline, params, scoring="roc_auc", cv=cv, n_jobs=n_jobs)
+    search.fit(train_fe, train_fe["Survived"])
+    model = search.best_estimator_
+    pred = model.predict(holdout_fe).astype(int).ravel()
+    prob = model.predict_proba(holdout_fe)[:, 1]
+    metrics = classification_metrics(holdout_fe["Survived"], pred, prob)
+    print_metrics(f"CatBoost (best params={search.best_params_})", metrics)
+    return TrainingResult(
+        model=model, metrics=metrics, predictions=pred, probabilities=prob, search=search
     )

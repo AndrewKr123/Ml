@@ -31,6 +31,7 @@ from src.experiments.titanic import (
     train_svm_linear_cv,
     train_svm_rbf_cv,
     train_decision_tree_cv,
+    train_catboost_cv,
 )
 from src.reporting.titanic import save_report
 from utils.plotting import set_style
@@ -68,6 +69,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
     svm_linear = train_svm_linear_cv(train_fe, holdout_fe, cv, random_state)
     svm_rbf = train_svm_rbf_cv(train_fe, holdout_fe, cv, random_state)
     tree = train_decision_tree_cv(train_fe, holdout_fe, cv, random_state)
+    boost = train_catboost_cv(train_fe, holdout_fe, cv, random_state)
 
     print("\n=== СРАВНЕНИЕ ВСЕХ МОДЕЛЕЙ (hold-out test) ===")
     models_comp = {
@@ -75,7 +77,8 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         "Final (LR)": lr.metrics,
         "SVM (Linear)": svm_linear.metrics,
         "SVM (RBF)": svm_rbf.metrics,
-        "Decision Tree": tree.metrics
+        "Decision Tree": tree.metrics,
+        "CatBoost": boost.metrics,
     }
     for m_name, m_metrics in models_comp.items():
         print(
@@ -91,6 +94,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         svm_linear=svm_linear,
         svm_rbf=svm_rbf,
         tree=tree,
+        boost=boost,
         models_dir=MODELS_DIR,
         processed_dir=PROCESSED_DIR,
         test_size=test_size,

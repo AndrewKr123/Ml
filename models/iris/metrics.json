@@ -34,10 +34,24 @@
     "recall_macro": 0.9666666666666667,
     "roc_auc_ovr": 0.9716666666666667
   },
+  "xgboost": {
+    "accuracy": 0.9666666666666667,
+    "f1_macro": 0.9665831244778612,
+    "precision_macro": 0.9696969696969697,
+    "recall_macro": 0.9666666666666667,
+    "roc_auc_ovr": 0.98
+  },
   "cv_accuracy_lr": 0.9666666666666668,
   "cv_accuracy_svm_linear": 0.975,
   "cv_accuracy_svm_rbf": 0.975,
   "cv_accuracy_decision_tree": 0.9583333333333334,
+  "cv_accuracy_xgboost": 0.9666666666666668,
+  "best_params_xgboost": {
+    "model__learning_rate": 0.03,
+    "model__max_depth": 3,
+    "model__n_estimators": 50,
+    "model__subsample": 1.0
+  },
   "target_names": [
     "setosa",
     "versicolor",

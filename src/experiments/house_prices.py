@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from lightgbm import LGBMRegressor
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -97,3 +98,41 @@ def train_decision_tree_cv(
     metrics = regression_metrics(holdout_fe[TARGET], pred)
     print_metrics("Метрики дерева решений", metrics)
     return TrainingResult(model=model, metrics=metrics, predictions=pred, search=grid)
+
+
+def train_lightgbm_cv(
+    train_fe: pd.DataFrame,
+    holdout_fe: pd.DataFrame,
+    preprocessor: ColumnTransformer,
+    y_train_log: pd.Series,
+    cv: KFold,
+    random_state: int,
+    *,
+    n_jobs: int = -1,
+) -> TrainingResult:
+    """Подбирает LightGBM на log-target; возвращает прогнозы в долларах."""
+    pipeline = Pipeline([
+        ("preprocess", clone(preprocessor)),
+        ("model", LGBMRegressor(
+            objective="regression",
+            random_state=random_state,
+            n_jobs=1,
+            verbosity=-1,
+        )),
+    ])
+    params = {
+        "model__n_estimators": [200, 500],
+        "model__learning_rate": [0.03, 0.07],
+        "model__num_leaves": [15, 31],
+        "model__max_depth": [-1, 6],
+        "model__min_child_samples": [10, 20],
+    }
+    search = GridSearchCV(
+        pipeline, params, scoring="neg_root_mean_squared_error", cv=cv, n_jobs=n_jobs
+    )
+    search.fit(train_fe, y_train_log)
+    model = search.best_estimator_
+    pred = np.expm1(model.predict(holdout_fe))
+    metrics = regression_metrics(holdout_fe[TARGET], pred)
+    print_metrics(f"LightGBM (best params={search.best_params_})", metrics)
+    return TrainingResult(model=model, metrics=metrics, predictions=pred, search=search)

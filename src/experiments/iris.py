@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from xgboost import XGBClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.svm import SVC
@@ -144,6 +145,44 @@ def train_decision_tree_cv(
     prob = model.predict_proba(X_holdout)
     metrics = classification_metrics_multiclass(y_holdout, pred, prob)
     print_metrics("Decision Tree", metrics)
+    return TrainingResult(
+        model=model, metrics=metrics, predictions=pred, probabilities=prob, search=search
+    )
+
+
+def train_xgboost_cv(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_holdout: pd.DataFrame,
+    y_holdout: pd.Series,
+    cv: StratifiedKFold,
+    random_state: int,
+    *,
+    n_jobs: int = -1,
+) -> TrainingResult:
+    """Подбирает XGBoost для многоклассовой классификации Iris."""
+    pipeline = build_iris_pipeline(
+        XGBClassifier(
+            objective="multi:softprob",
+            num_class=3,
+            eval_metric="mlogloss",
+            random_state=random_state,
+            n_jobs=1,
+        )
+    )
+    params = {
+        "model__n_estimators": [50, 100, 200],
+        "model__max_depth": [2, 3, 4],
+        "model__learning_rate": [0.03, 0.1],
+        "model__subsample": [0.8, 1.0],
+    }
+    search = GridSearchCV(pipeline, params, scoring="accuracy", cv=cv, n_jobs=n_jobs)
+    search.fit(X_train, y_train)
+    model = search.best_estimator_
+    pred = model.predict(X_holdout)
+    prob = model.predict_proba(X_holdout)
+    metrics = classification_metrics_multiclass(y_holdout, pred, prob)
+    print_metrics(f"XGBoost (best params={search.best_params_})", metrics)
     return TrainingResult(
         model=model, metrics=metrics, predictions=pred, probabilities=prob, search=search
     )

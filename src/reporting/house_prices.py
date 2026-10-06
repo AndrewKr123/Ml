@@ -22,6 +22,7 @@ def save_report(
     baseline: TrainingResult,
     ridge: TrainingResult,
     tree: TrainingResult,
+    boost: TrainingResult,
     models_dir: Path,
     processed_dir: Path,
     test_size: float,
@@ -33,14 +34,18 @@ def save_report(
     processed_dir.mkdir(parents=True, exist_ok=True)
 
     joblib.dump(ridge.model, models_dir / "model.joblib")
+    joblib.dump(boost.model, models_dir / "lightgbm.joblib")
     save_json(
         {
             "baseline": baseline.metrics,
             "final": ridge.metrics,
             "decision tree": tree.metrics,
+            "lightgbm": boost.metrics,
             "best_alpha": ridge.search.best_params_["model__alpha"],
             "cv_rmse_log": -ridge.search.best_score_,
             "best params for tree": tree.search.best_params_,
+            "best_params_lightgbm": boost.search.best_params_,
+            "cv_rmse_log_lightgbm": -boost.search.best_score_,
             "test_size": test_size,
             "random_state": random_state,
         },

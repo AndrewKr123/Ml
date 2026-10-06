@@ -32,6 +32,7 @@ from src.experiments.iris import (
     train_svm_linear_cv,
     train_svm_rbf_cv,
     train_decision_tree_cv,
+    train_xgboost_cv,
 )
 from src.reporting.iris import save_report
 from utils.plotting import set_style
@@ -87,6 +88,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
     svm_linear = train_svm_linear_cv(X_train, y_train, X_holdout, y_holdout, cv, random_state)
     svm_rbf = train_svm_rbf_cv(X_train, y_train, X_holdout, y_holdout, cv, random_state)
     tree = train_decision_tree_cv(X_train, y_train, X_holdout, y_holdout, cv, random_state)
+    boost = train_xgboost_cv(X_train, y_train, X_holdout, y_holdout, cv, random_state)
 
     # ================= Сравнение всех моделей =================
     print("\n=== СРАВНЕНИЕ ВСЕХ МОДЕЛЕЙ (hold-out test) ===")
@@ -97,6 +99,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         "SVM (Linear)": svm_linear.metrics,
         "SVM (RBF)": svm_rbf.metrics,
         "Decision Tree": tree.metrics,
+        "XGBoost": boost.metrics,
     }
 
     for m_name, m_metrics in models_comp.items():
@@ -122,6 +125,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         svm_linear=svm_linear,
         svm_rbf=svm_rbf,
         tree=tree,
+        boost=boost,
         models_dir=MODELS_DIR,
         processed_dir=PROCESSED_DIR,
         test_size=test_size,

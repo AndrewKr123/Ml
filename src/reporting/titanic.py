@@ -22,6 +22,7 @@ def save_report(
     svm_linear: TrainingResult,
     svm_rbf: TrainingResult,
     tree: TrainingResult,
+    boost: TrainingResult,
     models_dir: Path,
     processed_dir: Path,
     test_size: float,
@@ -35,6 +36,7 @@ def save_report(
     joblib.dump(lr.model, models_dir / "model.joblib")
     joblib.dump(svm_rbf.model, models_dir / "svm_rbf.joblib")
     joblib.dump(tree.model, models_dir / "decision_tree_model.joblib")
+    joblib.dump(boost.model, models_dir / "catboost.joblib")
     save_json(
         {
             "baseline": baseline.metrics,
@@ -42,13 +44,16 @@ def save_report(
             "svm_linear": svm_linear.metrics,
             "svm_rbf": svm_rbf.metrics,
             "dt_metrics": tree.metrics,
+            "catboost": boost.metrics,
             "best_C_lr": lr.search.best_params_["model__C"],
             "best_params_svm_linear": svm_linear.search.best_params_,
             "best_params_svm_rbf": svm_rbf.search.best_params_,
             "best_params_dt": tree.search.best_params_,
+            "best_params_catboost": boost.search.best_params_,
             "cv_roc_auc_lr": lr.search.best_score_,
             "cv_roc_auc_svm_rbf": svm_rbf.search.best_score_,
             "cv_roc_auc_dt": tree.search.best_score_,
+            "cv_roc_auc_catboost": boost.search.best_score_,
             "test_size": test_size,
             "random_state": random_state,
         },

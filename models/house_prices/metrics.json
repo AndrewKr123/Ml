@@ -17,6 +17,12 @@
     "mape_pct": 13.274913865483109,
     "r2": 0.8245154760075563
   },
+  "lightgbm": {
+    "mae": 16236.663172183227,
+    "rmse": 28848.829383722732,
+    "mape_pct": 9.658700624783501,
+    "r2": 0.8914967976158148
+  },
   "best_alpha": 30,
   "cv_rmse_log": 0.1298041141505272,
   "best params for tree": {
@@ -24,6 +30,14 @@
     "model__min_samples_leaf": 8,
     "model__min_samples_split": 20
   },
+  "best_params_lightgbm": {
+    "model__learning_rate": 0.03,
+    "model__max_depth": -1,
+    "model__min_child_samples": 10,
+    "model__n_estimators": 500,
+    "model__num_leaves": 15
+  },
+  "cv_rmse_log_lightgbm": 0.12277357963808506,
   "test_size": 0.2,
   "random_state": 42
 }

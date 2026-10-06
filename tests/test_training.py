@@ -41,6 +41,7 @@ class TrainingTests(unittest.TestCase):
             iris.train_svm_linear_cv,
             iris.train_svm_rbf_cv,
             iris.train_decision_tree_cv,
+            iris.train_xgboost_cv,
         ]
         with patch.object(iris, "GridSearchCV", side_effect=small_search):
             for train_model in functions:
@@ -73,8 +74,11 @@ class TrainingTests(unittest.TestCase):
         cv = KFold(n_splits=2, shuffle=True, random_state=42)
 
         with patch.object(house_prices, "GridSearchCV", side_effect=small_search), contextlib.redirect_stdout(io.StringIO()):
-            # Дерево не должно требовать результата предварительного обучения Ridge.
+            # Дерево и бустинг не должны требовать результата обучения Ridge.
             tree = house_prices.train_decision_tree_cv(
+                train, holdout, preprocessor, y_train_log, cv, 42
+            )
+            boost = house_prices.train_lightgbm_cv(
                 train, holdout, preprocessor, y_train_log, cv, 42
             )
             before_ridge = tree.model.predict(holdout).copy()
@@ -85,7 +89,7 @@ class TrainingTests(unittest.TestCase):
         self.assertFalse(hasattr(preprocessor, "transformers_"))
         self.assertIsNot(tree.model.named_steps["preprocess"], ridge.model.named_steps["preprocess"])
         np.testing.assert_array_equal(before_ridge, tree.model.predict(holdout))
-        for result in (tree, ridge):
+        for result in (tree, boost, ridge):
             self.assertIsNone(result.probabilities)
             np.testing.assert_allclose(result.predictions, np.expm1(result.model.predict(holdout)))
             expected_rmse = np.sqrt(np.mean((holdout["SalePrice"] - result.predictions) ** 2))

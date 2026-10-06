@@ -32,6 +32,7 @@ from src.experiments.house_prices import (
     train_baseline,
     train_ridge_cv,
     train_decision_tree_cv,
+    train_lightgbm_cv,
 )
 from src.reporting.house_prices import save_report
 from utils.plotting import set_style
@@ -65,6 +66,9 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
     tree = train_decision_tree_cv(
         train_fe, holdout_fe, preprocessor, y_train_log, cv, random_state
     )
+    boost = train_lightgbm_cv(
+        train_fe, holdout_fe, preprocessor, y_train_log, cv, random_state
+    )
 
     print("\n=== BASELINE vs FINAL (hold-out test, $) ===")
     for key, final_value in ridge.metrics.items():
@@ -79,6 +83,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         baseline=baseline,
         ridge=ridge,
         tree=tree,
+        boost=boost,
         models_dir=MODELS_DIR,
         processed_dir=PROCESSED_DIR,
         test_size=test_size,

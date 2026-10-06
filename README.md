@@ -1,4 +1,4 @@
-# ML: линейная и логистическая регрессия
+# ML: классические модели и градиентный бустинг
 
 Учебный репозиторий с двумя классическими Kaggle-задачами:
 
@@ -7,7 +7,7 @@
 
 Для каждой задачи есть: разведочный анализ данных (EDA) с объяснениями, честный пайплайн обучения с baseline-моделью для сравнения, и итоговая модель с воспроизводимыми метриками. Отдельно — теоретические ноутбуки по обоим методам и конспект вопросов к собеседованию.
 
-Дополнительно в проекте есть **Iris** — многоклассовая классификация трёх видов ириса. Для классификации сравниваются логистическая регрессия, SVM и деревья решений; для House Prices — также дерево регрессии. Теоретические материалы дополнены случайным лесом и разложением ошибки на смещение и разброс (bias–variance decomposition).
+Дополнительно в проекте есть **Iris** — многоклассовая классификация трёх видов ириса. Для классификации сравниваются логистическая регрессия, SVM, деревья решений и градиентный бустинг; для House Prices — линейные модели, дерево и бустинг. Используются три специализированные библиотеки: CatBoost для Titanic, LightGBM для House Prices и XGBoost для Iris.
 
 ## Структура репозитория
 
@@ -47,7 +47,10 @@ Ml/
 │   ├── randomforest.ipynb                теория случайного леса
 │   ├── BVD.ipynb                         разложение ошибки на смещение, разброс и шум
 │   ├── decisiontrees.ipynb               теория и практика деревьев решений
-│   └── gradientboosting.ipynb            градиентный бустинг над деревьями: антиградиент, потери и псевдоостатки
+│   ├── gradientboosting.ipynb            градиентный бустинг над деревьями: антиградиент, потери и псевдоостатки
+│   ├── kmeans.ipynb                      кластеризация K-means: теория, реализация с нуля и практика
+│   ├── knn.ipynb                         метод ближайших соседей: классификация, регрессия и bias–variance
+│   └── pca.ipynb                         метод главных компонент и его связь с SVD
 ├── questions/
 │   ├── questions_linearregression.md     вопросы по линейной регрессии
 │   └── questions_logisticregression.md   вопросы по логистической регрессии
@@ -77,8 +80,9 @@ JSON и отчётах обозначает LogisticRegression/Ridge с CV, а �
 - `notebooks/03_iris_eda.ipynb` — EDA для Iris.
 - `data/iris/processed/{train,holdout}_processed.csv` — обучающая и отложенная части Iris; фактическое имя каталога — `processed`.
 - `models/iris/holdout_predictions.csv` — истинные и предсказанные классы Iris; вместо Kaggle submission здесь сохраняются прогнозы на hold-out.
-- `models/iris/{svm_rbf,decision_tree}.joblib` — дополнительные модели Iris.
-- `models/titanic/{svm_rbf,decision_tree_model}.joblib` — дополнительные модели Titanic.
+- `models/iris/{svm_rbf,decision_tree,xgboost}.joblib` — дополнительные модели Iris.
+- `models/titanic/{svm_rbf,decision_tree_model,catboost}.joblib` — дополнительные модели Titanic.
+- `models/house_prices/lightgbm.joblib` — модель градиентного бустинга для House Prices.
 - `tutorials/decisiontrees.ipynb` — фактическое имя ноутбука по деревьям решений.
 - `tutorials/randomforest.ipynb` — случайный лес.
 - `tutorials/BVD.ipynb` — разложение MSE, регуляризация, деревья и ансамбли.
@@ -164,6 +168,9 @@ jupyter lab tutorials/svm.ipynb
 jupyter lab tutorials/decisiontrees.ipynb
 jupyter lab tutorials/randomforest.ipynb
 jupyter lab tutorials/BVD.ipynb
+jupyter lab tutorials/kmeans.ipynb
+jupyter lab tutorials/knn.ipynb
+jupyter lab tutorials/pca.ipynb
 ```
 
 ### 3. Скачивание сырых данных (опционально — они уже есть в репозитории)
@@ -206,7 +213,7 @@ python scripts/train_iris.py
 python scripts/train_iris.py --test-size 0.25 --random-state 0
 ```
 
-Он сравнивает baseline LR, LR с подбором `C`, линейную и RBF SVM, дерево решений. В `models/iris/` сохраняются LR (`model.joblib`), RBF SVM (`svm_rbf.joblib`), дерево (`decision_tree.joblib`), `metrics.json`, `holdout_predictions.csv` и графики. Линейная SVM отдельно не сериализуется. В `data/iris/processed/` записываются `train_processed.csv` и `holdout_processed.csv`: исходные числовые признаки после удаления служебных колонок, с возвращёнными метками; масштабирование выполняется внутри пайплайна.
+Он сравнивает baseline LR, LR с подбором `C`, линейную и RBF SVM, дерево решений и XGBoost. В `models/iris/` сохраняются LR (`model.joblib`), RBF SVM (`svm_rbf.joblib`), дерево (`decision_tree.joblib`), XGBoost (`xgboost.joblib`), `metrics.json`, `holdout_predictions.csv` и графики. Линейная SVM отдельно не сериализуется. В `data/iris/processed/` записываются `train_processed.csv` и `holdout_processed.csv`: исходные числовые признаки после удаления служебных колонок, с возвращёнными метками; масштабирование выполняется внутри пайплайна.
 
 Уточнение к сохранению моделей: `model.joblib` содержит выбранную LR для Titanic/Iris или Ridge для House Prices, а не автоматически лучшую из всех сравниваемых моделей. Скрипты сохраняют модель после обучения на обучающей части сплита; дополнительного обучения на всей выборке перед сохранением и формированием submission нет.
 
@@ -251,6 +258,17 @@ python scripts/train_iris.py --test-size 0.25 --random-state 0
 
 Лучшие параметры: `criterion=entropy`, `max_depth=4`, `min_samples_leaf=4`, `min_samples_split=2`, `class_weight=balanced`; CV ROC-AUC = **0.8669**. Дерево сохраняется в `models/titanic/decision_tree_model.joblib`. С учётом дерева максимальный Recall среди сохранённых результатов — **0.7681**; LR сохраняет преимущество по hold-out ROC-AUC.
 
+**CatBoost** выбран для Titanic как библиотека, ориентированная на табличные данные с категориальными признаками. 
+| Метрика | CatBoost |
+| --- | ---: |
+| Accuracy | 0.8324 |
+| Precision | 0.8095 |
+| Recall | 0.7391 |
+| F1 | 0.7727 |
+| ROC-AUC | 0.8485 |
+
+Лучшие параметры: `depth=5`, `iterations=300`, `learning_rate=0.1`, `l2_leaf_reg=7`; CV ROC-AUC = **0.8937**. Это лучший CV ROC-AUC среди проверенных моделей Titanic, хотя на конкретном hold-out LR выше по ROC-AUC. Модель сохраняется в `models/titanic/catboost.joblib`.
+
 ## House Prices — линейная регрессия
 
 **Baseline** (`LinearRegression`): все сырые числовые колонки как есть, только медианная импутация — без кодирования категорий, без чистки мультиколлинеарности, без лог-таргета.
@@ -279,6 +297,17 @@ python scripts/train_iris.py --test-size 0.25 --random-state 0
 
 Лучшие параметры: `max_depth=None`, `min_samples_leaf=8`, `min_samples_split=20`. Дерево немного улучшает baseline, но уступает Ridge по всем четырём метрикам. В JSON результаты находятся под ключом `decision tree`, параметры — `best params for tree`; отдельный `.joblib` для дерева этот скрипт не сохраняет.
 
+**LightGBM** выбран для House Prices как быстрый гистограммный бустинг для широких табличных данных. Он обучается на том же `log1p(SalePrice)` и оценивается после обратного `expm1`.
+
+| Метрика | LightGBM |
+| --- | ---: |
+| MAE | **$16 236.66** |
+| RMSE | $28 848.83 |
+| MAPE | 9.66% |
+| R² | 0.8915 |
+
+Лучшие параметры: `n_estimators=500`, `learning_rate=0.03`, `num_leaves=15`, `max_depth=-1`, `min_child_samples=10`; CV RMSE на log-таргете = **0.1228**. LightGBM улучшил Ridge по MAE и CV RMSE, а Ridge остался лучше по hold-out RMSE, MAPE и R². Модель сохраняется в `models/house_prices/lightgbm.joblib`.
+
 ## Iris — многоклассовая классификация сортов ириса
 
 **Уточнение для текущего кода:** приведённое ниже описание поиска PCA относится к предыдущему варианту эксперимента. Сейчас `build_iris_pipeline()` содержит `ColumnTransformer` с `RobustScaler` и модель; шага PCA и его перебора в `scripts/train_iris.py` нет. Baseline также использует этот масштабировщик. Таблицы ниже соответствуют сохранённому `models/iris/metrics.json`; JSON не содержит лучших гиперпараметров Iris и не подтверждает прежние значения `pca`. Актуальный путь EDA — `notebooks/03_iris_eda.ipynb`.
@@ -290,6 +319,7 @@ python scripts/train_iris.py --test-size 0.25 --random-state 0
 **SVM (Linear)**: линейный метод опорных векторов на масштабированных признаках с опциональным PCA, подбор `C`.
 **SVM (RBF)**: метод опорных векторов с радиально-базисным ядром для учёта нелинейных границ, подбор `C` и `gamma`.
 **Decision Tree**: дерево решений с подбором глубины, минимального размера листа/узла, критерия разбиения и весов классов.
+**XGBoost**: многоклассовый градиентный бустинг (`multi:softprob`) с подбором числа и глубины деревьев, learning rate и subsample.
 
 Метрики на одном и том же hold-out сплите (20% от датасета, 30 объектов), воспроизводятся командой `python scripts/train_iris.py`:
 
@@ -311,12 +341,16 @@ Hold-out содержит всего 30 объектов; одна ошибка 
 | **SVM Linear** | **0.9750** | **1.0000** |
 | **SVM RBF** | **0.9750** | 0.9667 |
 | Decision Tree | 0.9583 | 0.9667 |
+| XGBoost | 0.9667 | 0.9667 |
 
 Лучшие гиперпараметры по кросс-валидации:
 - **Final LR**: `C = 10`, `pca = passthrough` (PCA не выбран)
 - **SVM Linear**: `C = 3`, `pca = passthrough`
 - **SVM RBF**: `C = 10`, `gamma = 0.1`, `pca = passthrough`
 - **Decision Tree**: `criterion = gini`, `max_depth = 3`, `min_samples_leaf = 1`, `min_samples_split = 2`, `class_weight = None`, `pca = passthrough`
+- **XGBoost**: `n_estimators = 50`, `max_depth = 3`, `learning_rate = 0.03`, `subsample = 1.0`
+
+XGBoost получил hold-out accuracy **0.9667**, F1 macro **0.9666** и ROC-AUC OVR **0.9800**. На маленьком hold-out он совпал по accuracy с LR, RBF SVM и деревом, но линейный SVM остался лучшим. Модель сохраняется в `models/iris/xgboost.joblib`.
 
 Подробности EDA — `notebooks/02_iris_eda.ipynb`; код предобработки — `src/iris_preprocessing.py`; диагностические графики (confusion matrix, ROC-кривые OVR) — `models/iris/plots/`.
 
