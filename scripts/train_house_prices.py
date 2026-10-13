@@ -30,24 +30,27 @@ from src.house_prices_preprocessing import (
 
 from src.experiments.house_prices import (
     train_baseline,
+    train_random_forest_cv,
     train_ridge_cv,
     train_decision_tree_cv,
     train_lightgbm_cv,
 )
 from src.reporting.house_prices import save_report
+from src.reporting.random_forest import save_random_forest_report
 from utils.plotting import set_style
 
 MODELS_DIR = Path("models/house_prices")
 PROCESSED_DIR = Path("data/house_prices/processed")
 
 
-def run(test_size: float = 0.2, random_state: int = 42) -> None:
+def run(test_size: float = 0.2, random_state: int = 42, random_forest_only: bool = False) -> None:
     set_style()
     train_raw, test_raw = load_raw()
 
     train_df, holdout_df = train_test_split(train_raw, test_size=test_size, random_state=random_state)
 
-    baseline = train_baseline(train_df, holdout_df)
+    if not random_forest_only:
+        baseline = train_baseline(train_df, holdout_df)
 
     # Общие признаки и log-target для Ridge и дерева.
     train_fe = engineer_and_clean(train_df)
@@ -60,6 +63,14 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
     y_train_log = np.log1p(train_fe[TARGET])
 
     cv = KFold(n_splits=5, shuffle=True, random_state=random_state)
+    if random_forest_only:
+        forest = train_random_forest_cv(train_fe, holdout_fe, preprocessor, y_train_log, cv, random_state)
+        save_random_forest_report(
+            forest, MODELS_DIR, test_size=test_size, random_state=random_state,
+            test_fe=test_fe, test_raw=test_raw,
+        )
+        return
+
     ridge = train_ridge_cv(train_fe, holdout_fe, preprocessor, y_train_log, cv, random_state)
 
     # ================= Decision Tree =================
@@ -75,6 +86,8 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         base_value = baseline.metrics[key]
         print(f"{key:>5}: {base_value:,.2f} -> {final_value:,.2f}  (delta {final_value - base_value:+,.2f})")
 
+    forest = train_random_forest_cv(train_fe, holdout_fe, preprocessor, y_train_log, cv, random_state)
+
     save_report(
         train_fe=train_fe,
         holdout_fe=holdout_fe,
@@ -84,6 +97,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         ridge=ridge,
         tree=tree,
         boost=boost,
+        forest=forest,
         models_dir=MODELS_DIR,
         processed_dir=PROCESSED_DIR,
         test_size=test_size,
@@ -95,5 +109,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=42)
+    parser.add_argument("--random-forest-only", action="store_true", help="Обучить и сохранить только случайный лес")
     args = parser.parse_args()
-    run(test_size=args.test_size, random_state=args.random_state)
+    run(test_size=args.test_size, random_state=args.random_state, random_forest_only=args.random_forest_only)

@@ -27,6 +27,7 @@ from src.titanic_preprocessing import engineer_features, impute_age_by_title, lo
 
 from src.experiments.titanic import (
     train_baseline,
+    train_random_forest_cv,
     train_logistic_cv,
     train_svm_linear_cv,
     train_svm_rbf_cv,
@@ -34,6 +35,7 @@ from src.experiments.titanic import (
     train_catboost_cv,
 )
 from src.reporting.titanic import save_report
+from src.reporting.random_forest import save_random_forest_report
 from utils.plotting import set_style
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn.svm")
@@ -42,7 +44,7 @@ MODELS_DIR = Path("models/titanic")
 PROCESSED_DIR = Path("data/titanic/processed")
 
 
-def run(test_size: float = 0.2, random_state: int = 42) -> None:
+def run(test_size: float = 0.2, random_state: int = 42, random_forest_only: bool = False) -> None:
     set_style()
     train_raw, test_raw = load_raw()
 
@@ -50,7 +52,8 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         train_raw, test_size=test_size, stratify=train_raw["Survived"], random_state=random_state
     )
 
-    baseline = train_baseline(train_df, holdout_df, random_state)
+    if not random_forest_only:
+        baseline = train_baseline(train_df, holdout_df, random_state)
 
     # Общие признаки для моделей с подбором параметров.
     train_fe = engineer_features(train_df)
@@ -59,6 +62,14 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
     train_fe, holdout_fe, test_fe = impute_age_by_title(train_fe, holdout_fe, test_fe)
 
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
+    if random_forest_only:
+        forest = train_random_forest_cv(train_fe, holdout_fe, cv, random_state)
+        save_random_forest_report(
+            forest, MODELS_DIR, test_size=test_size, random_state=random_state,
+            test_fe=test_fe, test_raw=test_raw,
+        )
+        return
+
     lr = train_logistic_cv(train_fe, holdout_fe, cv, random_state)
 
     print("\n=== BASELINE vs FINAL (hold-out test) ===")
@@ -84,6 +95,8 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         print(
             f"{m_name:<15} | ROC-AUC: {m_metrics.get('roc_auc', 0):.4f} | Accuracy: {m_metrics.get('accuracy', 0):.4f}"
         )
+    forest = train_random_forest_cv(train_fe, holdout_fe, cv, random_state)
+
     save_report(
         train_fe=train_fe,
         holdout_fe=holdout_fe,
@@ -95,6 +108,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         svm_rbf=svm_rbf,
         tree=tree,
         boost=boost,
+        forest=forest,
         models_dir=MODELS_DIR,
         processed_dir=PROCESSED_DIR,
         test_size=test_size,
@@ -106,5 +120,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test-size", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=42)
+    parser.add_argument("--random-forest-only", action="store_true", help="Обучить и сохранить только случайный лес")
     args = parser.parse_args()
-    run(test_size=args.test_size, random_state=args.random_state)
+    run(test_size=args.test_size, random_state=args.random_state, random_forest_only=args.random_forest_only)

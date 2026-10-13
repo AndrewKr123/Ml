@@ -1,0 +1,25 @@
+{
+  "train": {
+    "accuracy": 0.9833333333333333,
+    "f1_macro": 0.9833229101521784,
+    "precision_macro": 0.9841269841269842,
+    "recall_macro": 0.9833333333333334,
+    "roc_auc_ovr": 0.999375
+  },
+  "test": {
+    "accuracy": 0.9666666666666667,
+    "f1_macro": 0.9665831244778612,
+    "precision_macro": 0.9696969696969697,
+    "recall_macro": 0.9666666666666667,
+    "roc_auc_ovr": 0.9866666666666667
+  },
+  "best_params": {
+    "model__max_depth": null,
+    "model__max_features": "sqrt",
+    "model__min_samples_leaf": 2
+  },
+  "cv_scoring": "accuracy",
+  "cv_best_score": 0.9666666666666668,
+  "test_size": 0.2,
+  "random_state": 42
+}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
 from lightgbm import LGBMRegressor
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
@@ -136,3 +137,34 @@ def train_lightgbm_cv(
     metrics = regression_metrics(holdout_fe[TARGET], pred)
     print_metrics(f"LightGBM (best params={search.best_params_})", metrics)
     return TrainingResult(model=model, metrics=metrics, predictions=pred, search=search)
+
+
+def train_random_forest_cv(
+    train_fe: pd.DataFrame,
+    holdout_fe: pd.DataFrame,
+    preprocessor: ColumnTransformer,
+    y_train_log: pd.Series,
+    cv: KFold,
+    random_state: int,
+    *,
+    n_jobs: int = -1,
+) -> TrainingResult:
+    """Подбирает случайный лес на train; возвращает метрики train и holdout."""
+    pipeline = Pipeline([("preprocess", clone(preprocessor)),
+        ("model", RandomForestRegressor(n_estimators=200, random_state=random_state, n_jobs=1))])
+    params = {
+        "model__max_depth": [None, 5, 10],
+        "model__min_samples_leaf": [1, 2, 4],
+        "model__max_features": [0.5, 1.0],
+    }
+    search = GridSearchCV(
+        pipeline, params, scoring="neg_root_mean_squared_error", cv=cv, n_jobs=n_jobs
+    )
+    search.fit(train_fe, y_train_log)
+    model = search.best_estimator_
+    pred = np.expm1(model.predict(holdout_fe))
+    metrics = regression_metrics(holdout_fe[TARGET], pred)
+    print_metrics(f"Random Forest (best params={search.best_params_})", metrics)
+    train_metrics = regression_metrics(train_fe[TARGET], np.expm1(model.predict(train_fe)))
+    print_metrics("Random Forest: train", train_metrics)
+    return TrainingResult(model=model, metrics=metrics, predictions=pred, search=search, train_metrics=train_metrics)

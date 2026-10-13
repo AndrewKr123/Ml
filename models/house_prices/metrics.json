@@ -39,5 +39,28 @@
   },
   "cv_rmse_log_lightgbm": 0.12277357963808506,
   "test_size": 0.2,
-  "random_state": 42
+  "random_state": 42,
+  "random_forest": {
+    "train": {
+      "mae": 7422.524690215854,
+      "rmse": 13369.500141338453,
+      "mape_pct": 4.107464184039027,
+      "r2": 0.9700323540504445
+    },
+    "test": {
+      "mae": 16219.524132629589,
+      "rmse": 28408.999793877014,
+      "mape_pct": 9.660068909292624,
+      "r2": 0.8947800592193491
+    },
+    "best_params": {
+      "model__max_depth": null,
+      "model__max_features": 0.5,
+      "model__min_samples_leaf": 2
+    },
+    "cv_scoring": "neg_root_mean_squared_error",
+    "cv_best_score": -0.1346777476544185,
+    "test_size": 0.2,
+    "random_state": 42
+  }
 }

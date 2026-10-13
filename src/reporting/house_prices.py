@@ -9,6 +9,7 @@ import pandas as pd
 
 from src.evaluation import save_json
 from src.experiments.result import TrainingResult
+from src.reporting.random_forest import save_random_forest_report
 from src.house_prices_preprocessing import TARGET
 from utils.plotting import plot_coefficients, plot_predicted_vs_actual, plot_residuals
 
@@ -23,6 +24,7 @@ def save_report(
     ridge: TrainingResult,
     tree: TrainingResult,
     boost: TrainingResult,
+    forest: TrainingResult,
     models_dir: Path,
     processed_dir: Path,
     test_size: float,
@@ -78,3 +80,8 @@ def save_report(
     submission.to_csv(models_dir / "submission.csv", index=False)
 
     print(f"\nАртефакты сохранены в {models_dir}/ и {processed_dir}/")
+
+    save_random_forest_report(
+        forest, models_dir, test_size=test_size, random_state=random_state,
+        test_fe=test_fe, test_raw=test_raw,
+    )

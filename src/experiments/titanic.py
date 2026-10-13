@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
 from catboost import CatBoostClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
@@ -162,4 +163,35 @@ def train_catboost_cv(
     print_metrics(f"CatBoost (best params={search.best_params_})", metrics)
     return TrainingResult(
         model=model, metrics=metrics, predictions=pred, probabilities=prob, search=search
+    )
+
+
+def train_random_forest_cv(
+    train_fe: pd.DataFrame,
+    holdout_fe: pd.DataFrame,
+    cv: StratifiedKFold,
+    random_state: int,
+    *,
+    n_jobs: int = -1,
+) -> TrainingResult:
+    """Подбирает случайный лес на train; возвращает метрики train и holdout."""
+    pipeline = build_final_pipeline(
+        RandomForestClassifier(n_estimators=200, random_state=random_state, n_jobs=1)
+    )
+    params = {
+        "model__max_depth": [None, 5, 10],
+        "model__min_samples_leaf": [1, 2, 4],
+        "model__max_features": ["sqrt", 0.8],
+    }
+    search = GridSearchCV(pipeline, params, scoring="roc_auc", cv=cv, n_jobs=n_jobs)
+    search.fit(train_fe, train_fe["Survived"])
+    model = search.best_estimator_
+    pred = model.predict(holdout_fe).astype(int).ravel()
+    prob = model.predict_proba(holdout_fe)[:, 1]
+    metrics = classification_metrics(holdout_fe["Survived"], pred, prob)
+    print_metrics(f"Random Forest (best params={search.best_params_})", metrics)
+    train_metrics = classification_metrics(train_fe["Survived"], model.predict(train_fe), model.predict_proba(train_fe)[:, 1])
+    print_metrics("Random Forest: train", train_metrics)
+    return TrainingResult(
+        model=model, metrics=metrics, predictions=pred, probabilities=prob, search=search, train_metrics=train_metrics
     )

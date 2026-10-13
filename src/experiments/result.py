@@ -22,3 +22,4 @@ class TrainingResult:
     predictions: np.ndarray
     probabilities: np.ndarray | None = None
     search: GridSearchCV | None = None
+    train_metrics: dict[str, float | None] | None = None

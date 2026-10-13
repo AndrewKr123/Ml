@@ -67,5 +67,30 @@
   "cv_roc_auc_dt": 0.8669258282933832,
   "cv_roc_auc_catboost": 0.8936661679490833,
   "test_size": 0.2,
-  "random_state": 42
+  "random_state": 42,
+  "random_forest": {
+    "train": {
+      "accuracy": 0.8764044943820225,
+      "precision": 0.8936170212765957,
+      "recall": 0.7692307692307693,
+      "f1": 0.8267716535433071,
+      "roc_auc": 0.9372074394853438
+    },
+    "test": {
+      "accuracy": 0.8156424581005587,
+      "precision": 0.8333333333333334,
+      "recall": 0.6521739130434783,
+      "f1": 0.7317073170731707,
+      "roc_auc": 0.8517127799736495
+    },
+    "best_params": {
+      "model__max_depth": 5,
+      "model__max_features": 0.8,
+      "model__min_samples_leaf": 2
+    },
+    "cv_scoring": "roc_auc",
+    "cv_best_score": 0.8854421434828958,
+    "test_size": 0.2,
+    "random_state": 42
+  }
 }

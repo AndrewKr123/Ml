@@ -28,6 +28,7 @@ from src.iris_preprocessing import load_raw, prepare_features
 
 from src.experiments.iris import (
     train_baseline,
+    train_random_forest_cv,
     train_logistic_cv,
     train_svm_linear_cv,
     train_svm_rbf_cv,
@@ -35,6 +36,7 @@ from src.experiments.iris import (
     train_xgboost_cv,
 )
 from src.reporting.iris import save_report
+from src.reporting.random_forest import save_random_forest_report
 from utils.plotting import set_style
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn.svm")
@@ -43,7 +45,7 @@ MODELS_DIR = Path("models/iris")
 PROCESSED_DIR = Path("data/iris/processed")
 
 
-def run(test_size: float = 0.2, random_state: int = 42) -> None:
+def run(test_size: float = 0.2, random_state: int = 42, random_forest_only: bool = False) -> None:
     set_style()
 
     df = load_raw()
@@ -69,6 +71,14 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         shuffle=True,
         random_state=random_state,
     )
+
+    if random_forest_only:
+        forest = train_random_forest_cv(X_train, y_train, X_holdout, y_holdout, cv, random_state)
+        save_random_forest_report(
+            forest, MODELS_DIR, test_size=test_size, random_state=random_state,
+            y_holdout=y_holdout,
+        )
+        return
 
     baseline = train_baseline(X_train, y_train, X_holdout, y_holdout, random_state)
     lr = train_logistic_cv(X_train, y_train, X_holdout, y_holdout, cv, random_state)
@@ -113,6 +123,8 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
             f"ROC-AUC OVR: {roc_auc_text}"
         )
 
+    forest = train_random_forest_cv(X_train, y_train, X_holdout, y_holdout, cv, random_state)
+
     save_report(
         train_df=train_df,
         holdout_df=holdout_df,
@@ -126,6 +138,7 @@ def run(test_size: float = 0.2, random_state: int = 42) -> None:
         svm_rbf=svm_rbf,
         tree=tree,
         boost=boost,
+        forest=forest,
         models_dir=MODELS_DIR,
         processed_dir=PROCESSED_DIR,
         test_size=test_size,
@@ -148,9 +161,11 @@ if __name__ == "__main__":
         default=42,
     )
 
+    parser.add_argument("--random-forest-only", action="store_true", help="Обучить и сохранить только случайный лес")
     args = parser.parse_args()
 
     run(
         test_size=args.test_size,
         random_state=args.random_state,
+        random_forest_only=args.random_forest_only,
     )
