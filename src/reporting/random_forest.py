@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src.evaluation import save_json
-from src.experiments.result import TrainingResult
+from src.classical.result import TrainingResult
 
 
 def save_random_forest_report(

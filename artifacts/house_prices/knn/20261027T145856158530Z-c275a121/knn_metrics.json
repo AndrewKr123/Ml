@@ -1,0 +1,23 @@
+{
+  "train": {
+    "mae": 133.33877414026782,
+    "rmse": 306.32586974009956,
+    "mape_pct": 0.06321733533768757,
+    "r2": 0.9999842677934635
+  },
+  "test": {
+    "mae": 21307.59123358156,
+    "rmse": 37732.322405389954,
+    "mape_pct": 12.394860053198515,
+    "r2": 0.8143849276227322
+  },
+  "best_params": {
+    "model__n_neighbors": 7,
+    "model__p": 1,
+    "model__weights": "distance"
+  },
+  "cv_scoring": "neg_root_mean_squared_error",
+  "cv_best_score": -0.16673396892693595,
+  "test_size": 0.2,
+  "random_state": 42
+}

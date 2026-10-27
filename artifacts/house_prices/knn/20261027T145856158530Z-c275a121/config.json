@@ -1,0 +1,8 @@
+{
+  "test_size": 0.2,
+  "random_state": 42,
+  "random_forest_only": false,
+  "knn_only": true,
+  "preprocessing_protocol": "legacy-v1",
+  "prediction_scale": "dollars (model predicts log1p)"
+}

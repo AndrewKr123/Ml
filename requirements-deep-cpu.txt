@@ -1,0 +1,3 @@
+# CPU-only PyTorch; install separately from the classical dependencies.
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu

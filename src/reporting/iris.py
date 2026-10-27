@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src.evaluation import save_json
-from src.experiments.result import TrainingResult
+from src.classical.result import TrainingResult
 from src.reporting.random_forest import save_random_forest_report
 from utils.plotting import plot_coefficients, plot_multiclass_confusion_matrix, plot_multiclass_roc
 

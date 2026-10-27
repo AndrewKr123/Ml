@@ -1,0 +1,89 @@
+{
+  "baseline": {
+    "mae": 22978.931782872893,
+    "rmse": 36839.72578819199,
+    "mape_pct": 13.461326537019028,
+    "r2": 0.8230628842255094
+  },
+  "final": {
+    "mae": 16414.396494895653,
+    "rmse": 28243.03034988283,
+    "mape_pct": 9.39054757902991,
+    "r2": 0.8960058879116531
+  },
+  "decision tree": {
+    "mae": 22894.40927401717,
+    "rmse": 36688.19351419471,
+    "mape_pct": 13.274913865483109,
+    "r2": 0.8245154760075563
+  },
+  "lightgbm": {
+    "mae": 16236.663172183227,
+    "rmse": 28848.829383722732,
+    "mape_pct": 9.658700624783501,
+    "r2": 0.8914967976158148
+  },
+  "best_alpha": 30,
+  "cv_rmse_log": 0.1298041141505272,
+  "best params for tree": {
+    "model__max_depth": null,
+    "model__min_samples_leaf": 8,
+    "model__min_samples_split": 20
+  },
+  "best_params_lightgbm": {
+    "model__learning_rate": 0.03,
+    "model__max_depth": -1,
+    "model__min_child_samples": 10,
+    "model__n_estimators": 500,
+    "model__num_leaves": 15
+  },
+  "cv_rmse_log_lightgbm": 0.12277357963808506,
+  "test_size": 0.2,
+  "random_state": 42,
+  "random_forest": {
+    "train": {
+      "mae": 7422.524690215854,
+      "rmse": 13369.500141338453,
+      "mape_pct": 4.107464184039027,
+      "r2": 0.9700323540504445
+    },
+    "test": {
+      "mae": 16219.524132629589,
+      "rmse": 28408.999793877014,
+      "mape_pct": 9.660068909292624,
+      "r2": 0.8947800592193491
+    },
+    "best_params": {
+      "model__max_depth": null,
+      "model__max_features": 0.5,
+      "model__min_samples_leaf": 2
+    },
+    "cv_scoring": "neg_root_mean_squared_error",
+    "cv_best_score": -0.1346777476544185,
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "knn": {
+    "train": {
+      "mae": 133.33877414026782,
+      "rmse": 306.32586974009956,
+      "mape_pct": 0.06321733533768757,
+      "r2": 0.9999842677934635
+    },
+    "test": {
+      "mae": 21307.59123358156,
+      "rmse": 37732.322405389954,
+      "mape_pct": 12.394860053198515,
+      "r2": 0.8143849276227322
+    },
+    "best_params": {
+      "model__n_neighbors": 7,
+      "model__p": 1,
+      "model__weights": "distance"
+    },
+    "cv_scoring": "neg_root_mean_squared_error",
+    "cv_best_score": -0.16673396892693595,
+    "test_size": 0.2,
+    "random_state": 42
+  }
+}

@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 
 from src.evaluation import save_json
-from src.experiments.result import TrainingResult
+from src.classical.result import TrainingResult
 from src.reporting.random_forest import save_random_forest_report
-from src.house_prices_preprocessing import TARGET
+from src.datasets.house_prices import TARGET
 from utils.plotting import plot_coefficients, plot_predicted_vs_actual, plot_residuals
 
 

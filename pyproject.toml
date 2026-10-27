@@ -8,5 +8,5 @@ version = "0.1.0"
 description = "Учебный проект: линейная регрессия (House Prices) и логистическая регрессия (Titanic)"
 requires-python = ">=3.10"
 
-[tool.setuptools]
-packages = ["src", "src.experiments", "src.reporting", "utils"]
+[tool.setuptools.packages.find]
+include = ["src*", "utils*", "scripts*"]

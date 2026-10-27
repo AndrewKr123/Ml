@@ -22,6 +22,7 @@ from sklearn.preprocessing import StandardScaler
 from src.experiments import house_prices, iris, titanic
 from src.evaluation import classification_metrics, classification_metrics_multiclass, regression_metrics
 from src.reporting.random_forest import save_random_forest_report
+from src.reporting.knn import save_knn_report
 from src.experiments.result import TrainingResult
 from src.iris_preprocessing import load_raw, prepare_features
 
@@ -50,6 +51,7 @@ class TrainingTests(unittest.TestCase):
             iris.train_decision_tree_cv,
             iris.train_xgboost_cv,
             iris.train_random_forest_cv,
+            iris.train_knn_cv,
         ]
         with patch.object(iris, "GridSearchCV", side_effect=small_search):
             for train_model in functions:
@@ -96,6 +98,9 @@ class TrainingTests(unittest.TestCase):
             forest = house_prices.train_random_forest_cv(
                 train, holdout, preprocessor, y_train_log, cv, 42
             )
+            knn = house_prices.train_knn_cv(
+                train, holdout, preprocessor, y_train_log, cv, 42
+            )
             before_ridge = tree.model.predict(holdout).copy()
             ridge = house_prices.train_ridge_cv(
                 train, holdout, preprocessor, y_train_log, cv, 42
@@ -104,7 +109,7 @@ class TrainingTests(unittest.TestCase):
         self.assertFalse(hasattr(preprocessor, "transformers_"))
         self.assertIsNot(tree.model.named_steps["preprocess"], ridge.model.named_steps["preprocess"])
         np.testing.assert_array_equal(before_ridge, tree.model.predict(holdout))
-        for result in (tree, boost, ridge, forest):
+        for result in (tree, boost, ridge, forest, knn):
             self.assertIsNone(result.probabilities)
             np.testing.assert_allclose(result.predictions, np.expm1(result.model.predict(holdout)))
             expected_rmse = np.sqrt(np.mean((holdout["SalePrice"] - result.predictions) ** 2))
@@ -150,6 +155,43 @@ class TrainingTests(unittest.TestCase):
             )
             submission = pd.read_csv(directory / "random_forest_submission.csv")
             np.testing.assert_array_equal(submission.Survived, forest.predictions)
+
+    def test_titanic_knn_and_report_roundtrip(self):
+        rng = np.random.default_rng(42)
+        frame = pd.DataFrame({
+            "Pclass": rng.integers(1, 4, 80), "Age": rng.uniform(1, 80, 80),
+            "Fare": rng.uniform(1, 5, 80), "FamilySize": rng.integers(1, 5, 80),
+            "IsAlone": rng.integers(0, 2, 80), "Sex": ["male", "female"] * 40,
+            "Embarked": "S", "Title": "Mr", "Deck": "Unknown",
+            "Survived": [0, 1] * 40,
+        })
+        train, holdout = train_test_split(frame, test_size=0.2, random_state=42, stratify=frame.Survived)
+        cv = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+        with patch.object(titanic, "GridSearchCV", side_effect=small_search), contextlib.redirect_stdout(io.StringIO()):
+            knn = titanic.train_knn_cv(train, holdout, cv, 42)
+        np.testing.assert_allclose(knn.probabilities, knn.model.predict_proba(holdout)[:, 1])
+        self.assertEqual(knn.train_metrics, classification_metrics(
+            train.Survived, knn.model.predict(train), knn.model.predict_proba(train)[:, 1]
+        ))
+        self.assertEqual(knn.metrics, classification_metrics(
+            holdout.Survived, knn.predictions, knn.probabilities
+        ))
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / "metrics.json").write_text('{"baseline": {"accuracy": 0.5}}')
+            save_knn_report(
+                knn, directory, test_size=0.2, random_state=42,
+                test_fe=holdout, test_raw=pd.DataFrame({"PassengerId": np.arange(len(holdout))}),
+            )
+            payload = json.loads((directory / "metrics.json").read_text())
+            self.assertEqual(payload["baseline"], {"accuracy": 0.5})
+            self.assertEqual(payload["knn"]["train"], knn.train_metrics)
+            self.assertEqual(payload["knn"]["test"], knn.metrics)
+            np.testing.assert_array_equal(
+                joblib.load(directory / "knn.joblib").predict(holdout), knn.predictions
+            )
+            submission = pd.read_csv(directory / "knn_submission.csv")
+            np.testing.assert_array_equal(submission.Survived, knn.predictions)
 
 
 if __name__ == "__main__":

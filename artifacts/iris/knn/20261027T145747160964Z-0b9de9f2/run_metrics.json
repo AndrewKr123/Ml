@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "models": {
+    "knn": {
+      "train": {
+        "accuracy": 0.9666666666666667,
+        "f1_macro": 0.9666666666666667,
+        "precision_macro": 0.9666666666666667,
+        "recall_macro": 0.9666666666666667,
+        "roc_auc_ovr": 0.9966666666666667
+      },
+      "validation": null,
+      "test": {
+        "accuracy": 0.9,
+        "f1_macro": 0.899749373433584,
+        "precision_macro": 0.9023569023569024,
+        "recall_macro": 0.9,
+        "roc_auc_ovr": 0.985
+      },
+      "cv": {
+        "scoring": "accuracy",
+        "best_score": 0.95,
+        "best_params": {
+          "model__n_neighbors": 3,
+          "model__p": 1,
+          "model__weights": "uniform"
+        }
+      }
+    }
+  },
+  "elapsed_seconds": 1.156696643000032
+}
